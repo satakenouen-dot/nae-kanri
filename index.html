@@ -1,0 +1,3165 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>苗生産管理</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#2E7D32;--green-l:#E8F5E9;--green-d:#1B5E20;
+  --blue:#1565C0;--blue-l:#E3F2FD;
+  --red:#B71C1C;--red-l:#FCE4EC;
+  --orange:#E65100;--orange-l:#FFF3E0;
+  --purple:#6A1B9A;--purple-l:#F3E5F5;
+  --bg:#F5F5F5;--card:#fff;--border:#E0E0E0;
+  --text:#212121;--text2:#757575;
+  --radius:12px;--safe-b:env(safe-area-inset-bottom,16px);
+  --nav-h:56px
+}
+body{
+  font-family:-apple-system,'Hiragino Sans','Noto Sans JP',sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;
+  min-height:100vh;overflow-x:hidden
+}
+.screen{display:none;min-height:100vh;flex-direction:column;padding-bottom:calc(var(--nav-h) + var(--safe-b))}
+.screen.active{display:flex}
+#screen-login{padding-bottom:0;min-height:100vh;align-items:center;justify-content:center;background:linear-gradient(160deg,#1B5E20,#2E7D32,#388E3C)}
+.header{background:var(--green);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.header h1{font-size:16px;font-weight:600}
+.hbtn{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:6px;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center}
+.hbtn:active{background:rgba(255,255,255,.2)}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav-h) + var(--safe-b));background:#fff;border-top:1px solid var(--border);display:flex;align-items:flex-start;z-index:100;padding-top:6px}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:4px 0;border:none;background:none;color:var(--text2);font-size:10px;font-family:inherit}
+.bnav-item.active{color:var(--green)}
+.bnav-icon{font-size:22px;line-height:1}
+.login-box{background:#fff;border-radius:20px;padding:40px 32px;text-align:center;width:min(340px,90vw);box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.login-icon{font-size:56px;margin-bottom:16px}
+.login-box h2{font-size:20px;margin-bottom:8px}
+.login-box p{color:var(--text2);font-size:13px;line-height:1.6;margin-bottom:28px}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#fff;border:1.5px solid #dadce0;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;color:#3c4043}
+.google-btn:active{background:#f5f5f5}
+.scroll-body{flex:1;overflow-y:auto;padding:12px 12px 24px}
+.card{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card-title{font-size:13px;font-weight:600;margin-bottom:6px}
+.card-sub{font-size:12px;color:var(--text2)}
+.month-nav{background:#fff;display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border)}
+.mnav-btn{background:none;border:none;font-size:22px;cursor:pointer;color:var(--green);padding:4px 10px;border-radius:8px}
+.mnav-btn:active{background:var(--green-l)}
+.month-title{font-size:17px;font-weight:600}
+.weekdays{display:grid;grid-template-columns:repeat(7,1fr);background:#fff;border-bottom:1px solid var(--border)}
+.weekday{text-align:center;padding:6px 0;font-size:11px;font-weight:600;color:var(--text2)}
+.weekday:nth-child(6){color:var(--blue)}.weekday:nth-child(7){color:var(--red)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border)}
+.cal-cell{background:var(--card);min-height:68px;padding:4px 3px;display:flex;flex-direction:column;gap:2px;cursor:pointer}
+.cal-cell:active{background:#f5f5f5}
+.cal-cell.empty{background:var(--bg);cursor:default;pointer-events:none}
+.cal-cell.today .day-num{background:var(--green);color:#fff;border-radius:50%}
+.day-num{font-size:11px;font-weight:600;width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+.sat .day-num{color:var(--blue)}.sun .day-num{color:var(--red)}
+.ev-tag{font-size:8px;padding:1px 3px;border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;line-height:1.5;border-left:2px solid}
+.ev-tag.播種{background:var(--blue-l);color:var(--blue);border-color:var(--blue)}
+.ev-tag.接ぎ木{background:var(--orange-l);color:var(--orange);border-color:var(--orange)}
+.ev-tag.出荷{background:var(--red-l);color:var(--red);border-color:var(--red)}
+.ev-tag.農薬{background:var(--purple-l);color:var(--purple);border-color:var(--purple)}
+.more-badge{font-size:8px;color:var(--text2);text-align:right;padding:0 2px}
+.legend{background:#fff;border-top:1px solid var(--border);padding:6px 12px;display:flex;gap:10px;flex-wrap:wrap}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)}
+.leg-dot{width:8px;height:8px;border-radius:2px;border-left:3px solid}
+.fab{position:fixed;bottom:calc(var(--nav-h) + var(--safe-b) + 14px);right:16px;width:52px;height:52px;background:var(--green);color:#fff;border:none;border-radius:50%;font-size:26px;cursor:pointer;box-shadow:0 4px 12px rgba(46,125,50,.4);z-index:90;display:flex;align-items:center;justify-content:center}
+.fab:active{transform:scale(.94)}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200}
+.overlay.open{display:flex;align-items:flex-end}
+.modal-sheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding-bottom:calc(20px + var(--safe-b))}
+.modal-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:10px auto 0}
+.modal-head{padding:14px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title-text{font-size:15px;font-weight:600}
+.mclose{background:none;border:none;font-size:20px;color:var(--text2);cursor:pointer;padding:4px}
+.modal-body-content{padding:14px 18px}
+.form-section{background:#fff;border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.form-label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+.form-input,.form-select{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:15px;color:var(--text);background:#fff;outline:none;font-family:inherit;appearance:none;-webkit-appearance:none}
+.form-input:focus,.form-select:focus{border-color:var(--green)}
+.form-row{display:flex;gap:8px}
+.form-row .form-group{flex:1}
+.form-group{margin-bottom:12px}
+.form-group:last-child{margin-bottom:0}
+/* 農薬名ピッカー */
+.kana-btn{padding:5px 0;width:36px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;text-align:center;color:var(--text1)}
+.kana-btn.active{background:var(--green);color:#fff;border-color:var(--green)}
+.pest-chip{padding:6px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;font-size:13px;cursor:pointer;white-space:nowrap;color:var(--text1);transition:background .15s}
+.pest-chip:hover{background:var(--green-l)}
+.pest-chip.selected{background:var(--green);color:#fff;border-color:var(--green)}
+.pest-selected-box{padding:8px 12px;border:2px solid var(--border);border-radius:10px;font-size:14px;min-height:40px;background:#fafafa;color:var(--text2)}
+.pest-selected-box.has-val{border-color:var(--green);color:var(--text1);font-weight:600}
+.suggest-box{background:var(--green-l);border:1px solid #A5D6A7;border-radius:10px;padding:12px;margin-top:10px}
+.suggest-box-header{font-size:11px;font-weight:600;color:var(--green);margin-bottom:8px}
+.suggest-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0}
+.suggest-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px}
+.suggest-badge.播種{background:var(--blue-l);color:var(--blue)}
+.suggest-badge.接ぎ木{background:var(--orange-l);color:var(--orange)}
+.suggest-badge.出荷{background:var(--red-l);color:var(--red)}
+.suggest-date{font-size:13px;font-weight:500}
+.suggest-note{font-size:10px;color:#388E3C;margin-top:6px;line-height:1.5}
+.submit-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--border);padding:10px 14px calc(10px + var(--safe-b));z-index:10}
+.btn-primary{width:100%;padding:14px;background:var(--green);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-primary:active{background:var(--green-d)}
+.btn-primary:disabled{background:#bdbdbd}
+.btn-danger{background:#c62828;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-outline{background:none;border:1.5px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--text)}
+.list-item{background:#fff;border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer}
+.list-item:active{background:#f5f5f5}
+.list-icon{font-size:20px;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.list-body{flex:1;min-width:0}
+.list-title{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.list-arrow{color:var(--text2);font-size:16px;flex-shrink:0}
+.seed-badge{display:inline-block;font-size:11px;font-weight:600;border-radius:20px;padding:3px 9px;cursor:pointer;user-select:none;border:1.5px solid}
+.seed-done{background:#E8F5E9;color:#2E7D32;border-color:#2E7D32}
+.seed-todo{background:#FFF8E1;color:#E65100;border-color:#FFB300}
+.seed-done:active,.seed-todo:active{opacity:.7}
+.settings-item{display:flex;align-items:center;gap:12px;padding:15px 16px;background:#fff;border-bottom:1px solid var(--border);cursor:pointer;border:none;width:100%;text-align:left;font-family:inherit;font-size:14px}
+.settings-item:active{background:var(--bg)}
+.settings-icon{font-size:22px;width:36px;text-align:center}
+.settings-section-title{font-size:11px;font-weight:600;color:var(--text2);padding:16px 16px 6px;text-transform:uppercase;letter-spacing:.05em}
+#loading{position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:999}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-state{text-align:center;padding:48px 24px;color:var(--text2)}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-text{font-size:14px}
+.ev-card{border-radius:10px;padding:12px;margin-bottom:8px;border-left:4px solid}
+.ev-card.播種{background:var(--blue-l);border-color:var(--blue)}
+.ev-card.接ぎ木{background:var(--orange-l);border-color:var(--orange)}
+.ev-card.出荷{background:var(--red-l);border-color:var(--red)}
+.ev-card.農薬{background:var(--purple-l);border-color:var(--purple)}
+.ev-card-type{font-size:11px;font-weight:600;margin-bottom:4px}
+.ev-card.播種 .ev-card-type{color:var(--blue)}
+.ev-card.接ぎ木 .ev-card-type{color:var(--orange)}
+.ev-card.出荷 .ev-card-type{color:var(--red)}
+.ev-card.農薬 .ev-card-type{color:var(--purple)}
+.ev-card-main{font-size:14px;font-weight:600}
+.ev-card-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.import-drop{border:2px dashed var(--border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all .2s}
+.import-drop:hover,.import-drop.drag-over{border-color:var(--green);background:var(--green-l)}
+.import-drop input{display:none}
+.search-bar{padding:8px 12px;background:#fff;border-bottom:1px solid var(--border)}
+.search-input{width:100%;border:1.5px solid var(--border);border-radius:20px;padding:8px 14px;font-size:14px;outline:none;font-family:inherit}
+.search-input:focus{border-color:var(--green)}
+@media print{
+  .bottom-nav,.fab,.header button{display:none!important}
+  .screen#screen-calendar{display:block!important;padding:0}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p style="color:var(--text2);font-size:13px">読み込み中...</p>
+</div>
+
+<!-- ログイン -->
+<div class="screen" id="screen-login">
+  <div class="login-box">
+    <div class="login-icon">🌱</div>
+    <h2>苗生産管理</h2>
+    <p>Googleアカウントでログインして<br>スケジュール管理を始めましょう</p>
+    <button class="google-btn" id="btn-google-login">
+      <svg viewBox="0 0 24 24" width="20" height="20">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Googleでログイン
+    </button>
+  </div>
+</div>
+
+<!-- ボトムナビ -->
+<nav class="bottom-nav" id="bottom-nav" style="display:none">
+  <button class="bnav-item active" data-tab="calendar">
+    <span class="bnav-icon">📅</span><span>カレンダー</span>
+  </button>
+  <button class="bnav-item" data-tab="orders">
+    <span class="bnav-icon">📋</span><span>注文</span>
+  </button>
+  <button class="bnav-item" data-tab="pesticide">
+    <span class="bnav-icon">🌿</span><span>農薬</span>
+  </button>
+  <button class="bnav-item" data-tab="settings">
+    <span class="bnav-icon">⚙️</span><span>設定</span>
+  </button>
+</nav>
+
+<!-- ① カレンダー -->
+<div class="screen" id="screen-calendar">
+  <div class="header">
+    <h1>🌱 苗生産管理</h1>
+    <button class="hbtn" id="btn-today">今日</button>
+  </div>
+  <div class="month-nav">
+    <button class="mnav-btn" id="btn-prev">‹</button>
+    <span class="month-title" id="month-title"></span>
+    <button class="mnav-btn" id="btn-next">›</button>
+  </div>
+  <div class="weekdays">
+    <div class="weekday">月</div><div class="weekday">火</div><div class="weekday">水</div>
+    <div class="weekday">木</div><div class="weekday">金</div><div class="weekday">土</div><div class="weekday">日</div>
+  </div>
+  <!-- 起動時復元バナー -->
+  <div id="gdrive-restore-banner" style="display:none;background:#E3F2FD;border-bottom:2px solid #1565C0;padding:12px 16px;align-items:center;gap:10px">
+    <span style="font-size:22px">☁️</span>
+    <div style="flex:1;font-size:13px;line-height:1.5">
+      <strong>データがありません</strong><br>
+      Googleドライブから前回のバックアップを復元しますか？
+    </div>
+    <button id="btn-restore-banner" style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">復元する</button>
+    <button id="btn-restore-banner-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#555;padding:4px">✕</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding-bottom:8px">
+    <div class="cal-grid" id="cal-grid"></div>
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--blue-l);border-color:var(--blue)"></div>播種</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--orange-l);border-color:var(--orange)"></div>接ぎ木</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--red-l);border-color:var(--red)"></div>出荷</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--purple-l);border-color:var(--purple)"></div>農薬</div>
+    </div>
+  </div>
+  <button class="fab" id="btn-cal-add">＋</button>
+</div>
+
+<!-- ② 注文一覧 -->
+<div class="screen" id="screen-orders">
+  <div class="header">
+    <h1>📋 注文一覧</h1>
+    <button class="hbtn" id="btn-order-add-h">＋</button>
+  </div>
+  <div class="search-bar">
+    <input class="search-input" id="order-search" placeholder="品目・品種・注文主で検索…" type="search">
+  </div>
+  <div class="scroll-body" id="order-list-body">
+    <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">注文がありません</div></div>
+  </div>
+  <button class="fab" id="btn-order-add-f">＋</button>
+</div>
+
+<!-- ③ 注文フォーム -->
+<div class="screen" id="screen-order-form">
+  <div class="header">
+    <button class="hbtn" id="btn-order-form-back">←</button>
+    <h1 id="order-form-title">注文を追加</h1>
+    <button class="hbtn" id="btn-order-delete" style="display:none">🗑</button>
+  </div>
+  <div class="scroll-body">
+    <div class="form-section">
+      <div class="form-group">
+        <label class="form-label">注文入力日</label>
+        <input class="form-input" id="f-orderDate" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">注文主</label>
+        <input class="form-input" id="f-customer" type="text" placeholder="農家名・会社名">
+      </div>
+      <div class="form-group">
+        <label class="form-label">携帯電話番号</label>
+        <input class="form-input" id="f-phone" type="tel" placeholder="090-1234-5678" inputmode="tel">
+      </div>
+      <div class="form-group">
+        <label class="form-label">品目 ＊</label>
+        <select class="form-select" id="f-crop">
+          <option value="">選択してください</option>
+        </select>
+      </div>
+      <!-- 実生・その他：品種名1欄 -->
+      <div class="form-group" id="variety-row-single">
+        <label class="form-label">品種</label>
+        <div id="variety-suggest-single" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px"></div>
+        <input class="form-input" id="f-variety-single" type="text" placeholder="例：桃太郎">
+      </div>
+      <!-- 接ぎ木：穂木・台木2欄（接ぎ選択時のみ表示） -->
+      <div id="variety-row-graft" style="display:none">
+        <div id="variety-suggest-graft" style="display:flex;flex-wrap:wrap;gap:5px;margin:0 0 5px"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">穂木品種</label>
+            <input class="form-input" id="f-variety-scion" type="text" placeholder="例：桃太郎">
+          </div>
+          <div class="form-group">
+            <label class="form-label">台木品種</label>
+            <input class="form-input" id="f-variety-stock" type="text" placeholder="例：キングバリア">
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">数量</label>
+          <input class="form-input" id="f-qty" type="text" placeholder="例：100本">
+        </div>
+        <div class="form-group">
+          <label class="form-label">規格（種類）</label>
+          <select class="form-select" id="f-type-sel">
+            <option value="">選択（任意）</option>
+            <option>9cm実生</option><option>9cm接ぎ</option>
+            <option>10.5cm実生</option><option>10.5cm接ぎ</option>
+            <option>128穴</option><option>SH128穴</option><option>DP128穴</option>
+            <option>72穴実生</option><option>200穴実生</option><option>200穴接ぎ</option>
+            <option>12cm実生</option>
+            <option value="__custom__">✏️ 直接入力…</option>
+          </select>
+          <input class="form-input" id="f-type" type="text" placeholder="規格を入力" autocomplete="off" style="display:none;margin-top:4px">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">単価（円）</label>
+        <input class="form-input" id="f-price" type="number" placeholder="例：185">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-group">
+        <label class="form-label">納品予定日 ＊</label>
+        <input class="form-input" id="f-delivery" type="date">
+      </div>
+
+      <!-- 播種日提案ボックス -->
+      <div id="sow-suggest-box" class="suggest-box" style="display:none">
+        <div class="suggest-box-header" id="sug-header">📊 過去データからの播種日提案</div>
+        <div class="suggest-row">
+          <span class="suggest-badge 播種">播種</span>
+          <span class="suggest-date" id="sug-sow-date">—</span>
+        </div>
+        <div id="sug-graft-row" class="suggest-row" style="display:none">
+          <span class="suggest-badge 接ぎ木">接ぎ木</span>
+          <span class="suggest-date" id="sug-graft-date">—</span>
+        </div>
+        <div class="suggest-row">
+          <span class="suggest-badge 出荷">出荷</span>
+          <span class="suggest-date" id="sug-ship-date">—</span>
+        </div>
+        <div class="suggest-note" id="sug-note"></div>
+        <button id="btn-apply-suggest" style="margin-top:8px;width:100%;padding:8px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">この日程を採用する</button>
+      </div>
+
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">播種日（確定）</label>
+        <input class="form-input" id="f-sow" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">接ぎ木日（確定）</label>
+        <input class="form-input" id="f-graft" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">出荷日</label>
+        <input class="form-input" id="f-ship" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">鉢上げ日</label>
+        <input class="form-input" id="f-pot" type="date">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-group">
+        <label class="form-label">メモ</label>
+        <input class="form-input" id="f-memo" type="text" placeholder="備考など">
+      </div>
+      <!-- 種子発注チェック -->
+      <label style="display:flex;align-items:center;gap:12px;padding:12px 4px;cursor:pointer;border-top:1px solid var(--border);margin-top:4px">
+        <input type="checkbox" id="f-seed-ordered" style="width:22px;height:22px;accent-color:var(--green);flex-shrink:0">
+        <span style="font-size:14px;font-weight:600;color:var(--text)">🌱 種子をメーカーに発注済み</span>
+      </label>
+    </div>
+  </div>
+  <div class="submit-bar" style="flex-direction:column;gap:8px">
+    <button class="btn-primary" id="btn-order-submit" style="width:100%">保存する</button>
+    <button class="btn-secondary" id="btn-print-hist" style="display:none;width:100%;padding:12px;background:#f0f0f0;border:1px solid #ccc;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🖨 農薬使用履歴を印刷</button>
+    <div id="order-sms-actions" style="display:none;margin-top:8px">
+      <div style="font-size:11px;color:var(--text2);padding:6px 0 4px">📱 顧客への連絡（携帯番号宛にSMS）</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#fafafa;border-radius:8px">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:600">完了日：</label>
+        <input type="date" id="sms-actual-date" class="form-input" style="flex:1;font-size:13px;padding:6px 8px">
+      </div>
+      <button class="btn-secondary" id="btn-sms-confirm"   style="width:100%;padding:11px;background:var(--green-l);color:var(--green);border:1px solid var(--green);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:6px">📩 受注確認SMSを送信</button>
+      <button class="btn-secondary" id="btn-photo-graft"   style="width:100%;padding:11px;background:#FFF3E0;color:var(--orange);border:1px solid var(--orange);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:6px">📸 接ぎ木完了 写真付き報告（顧客SMS送信）</button>
+      <button class="btn-secondary" id="btn-photo-pot"     style="width:100%;padding:11px;background:#F3E5F5;color:var(--purple);border:1px solid var(--purple);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:6px">📸 鉢上げ/定植完了 写真付き報告（顧客SMS送信）</button>
+      <div style="border-top:1px dashed var(--border);margin:8px 0 6px;padding-top:6px;font-size:11px;color:var(--text2)">📁 社内記録のみ（SMS送信なし）</div>
+      <button class="btn-secondary" id="btn-photo-ship"    style="width:100%;padding:11px;background:#fafafa;color:var(--text);border:1px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">📦 出荷完了を記録（日付更新のみ）</button>
+    </div>
+  </div>
+</div>
+
+<!-- ④ 農薬記録一覧 -->
+<div class="screen" id="screen-pesticide">
+  <div class="header">
+    <h1>🌿 農薬散布記録</h1>
+    <button class="hbtn" id="btn-pest-add-h">＋</button>
+  </div>
+  <div class="scroll-body" id="pesticide-list-body">
+    <div class="empty-state"><div class="empty-icon">🌿</div><div class="empty-text">農薬散布記録がありません</div></div>
+  </div>
+  <button class="fab" id="btn-pest-add-f">＋</button>
+</div>
+
+<!-- ⑤ 農薬記録フォーム -->
+<div class="screen" id="screen-pesticide-form">
+  <div class="header">
+    <button class="hbtn" id="btn-pest-form-back">←</button>
+    <h1 id="pest-form-title">農薬散布を記録</h1>
+    <button class="hbtn" id="btn-pest-delete" style="display:none">🗑</button>
+  </div>
+  <div class="scroll-body">
+    <div class="form-section">
+      <div class="form-group">
+        <label class="form-label">散布日 ＊</label>
+        <input class="form-input" id="pf-date" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">農薬名 ＊</label>
+        <input type="hidden" id="pf-name">
+        <input type="hidden" id="pf-ingredient-val">
+
+        <!-- マスターから選択 -->
+        <div id="pest-history-section" style="margin-bottom:8px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:5px">📋 農薬マスターから選択（タップで選択）</div>
+          <div id="pest-history-chips"
+            style="display:flex;flex-wrap:wrap;gap:6px;max-height:110px;overflow-y:auto;padding:4px 2px">
+            <span style="font-size:12px;color:var(--text2)">農薬マスターに登録がありません</span>
+          </div>
+        </div>
+
+        <!-- 選択済み表示 -->
+        <div id="pest-selected-area"
+          style="display:none;padding:9px 12px;background:var(--green-l);border:2px solid var(--green);border-radius:10px;margin-bottom:8px">
+          <div style="font-size:14px;font-weight:700;color:var(--text1)" id="pest-sel-name"></div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px" id="pest-sel-sub"></div>
+          <button type="button" id="btn-pest-clear"
+            style="font-size:11px;color:var(--green);background:none;border:none;cursor:pointer;padding:3px 0;margin-top:3px;text-decoration:underline">
+            ✕ クリア（選択し直す）
+          </button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">メモ</label>
+        <input class="form-input" id="pf-memo" type="text" placeholder="天気・担当者など">
+      </div>
+    </div>
+
+    <!-- 自動紐づけエリア -->
+    <div class="form-section">
+      <div style="font-size:13px;font-weight:600;color:var(--text1);margin-bottom:8px">📌 対象作物（自動検出）</div>
+      <div id="pest-crop-links">
+        <div style="color:var(--text2);font-size:12px">日付を入力すると栽培中の苗を自動検出します</div>
+      </div>
+    </div>
+  </div>
+  <div class="submit-bar">
+    <button class="btn-primary" id="btn-pest-submit">保存する</button>
+  </div>
+</div>
+
+<!-- ⑥ 設定 -->
+<div class="screen" id="screen-settings">
+  <div class="header">
+    <h1>⚙️ 設定</h1>
+    <div></div>
+  </div>
+  <div class="scroll-body" style="padding:0">
+    <div class="settings-section-title">データ管理</div>
+    <button class="settings-item" id="btn-open-master">
+      <span class="settings-icon">📦</span>
+      <span>農薬マスター管理</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <button class="settings-item" id="btn-open-variety-master">
+      <span class="settings-icon">🌱</span>
+      <span>品種マスター管理（登録品種データベース）</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <button class="settings-item" id="btn-open-import">
+      <span class="settings-icon">📊</span>
+      <span>栽培履歴データ取り込み（播種日提案に使用）</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <div class="settings-section-title">バックアップ</div>
+    <button class="settings-item" id="btn-export-data">
+      <span class="settings-icon">💾</span>
+      <span>データをエクスポート（JSONファイル保存）</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <button class="settings-item" id="btn-export-excel">
+      <span class="settings-icon">📊</span>
+      <span>Excel/OpenOffice形式で書き出し</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <div class="settings-section-title">Googleドライブ バックアップ</div>
+    <button class="settings-item" id="btn-gdrive-backup">
+      <span class="settings-icon">☁️</span>
+      <span class="gdrive-backup-label">Googleドライブにバックアップ</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <button class="settings-item" id="btn-gdrive-restore">
+      <span class="settings-icon">📥</span>
+      <span>Googleドライブから復元</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <div class="settings-section-title">Googleカレンダー通知</div>
+    <div style="padding:8px 16px;background:var(--green-l);font-size:11px;color:var(--text2);line-height:1.6">
+      播種日・接ぎ木日・出荷日などの予定をGoogleカレンダーに登録し、設定時刻にスマホへ通知します
+    </div>
+    <div style="padding:10px 16px;background:#fff;border-bottom:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" id="gcal-reminder-enable" style="width:18px;height:18px">
+        <span>カレンダーに通知を設定</span>
+      </label>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+        <span style="font-size:12px;color:var(--text2);width:80px">通知時刻：</span>
+        <select id="gcal-reminder-hour" class="form-select" style="flex:1;font-size:13px;padding:6px 8px">
+          <option value="6">6:00</option>
+          <option value="7">7:00</option>
+          <option value="8" selected>8:00</option>
+          <option value="9">9:00</option>
+          <option value="10">10:00</option>
+          <option value="17">17:00</option>
+          <option value="20">20:00</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <span style="font-size:12px;color:var(--text2);width:80px">通知タイミング：</span>
+        <select id="gcal-reminder-when" class="form-select" style="flex:1;font-size:13px;padding:6px 8px">
+          <option value="0">当日のみ</option>
+          <option value="1" selected>前日のみ</option>
+          <option value="0,1">当日 ＋ 前日</option>
+          <option value="3">3日前のみ</option>
+          <option value="1,3">前日 ＋ 3日前</option>
+          <option value="0,1,3">当日 ＋ 前日 ＋ 3日前</option>
+          <option value="7">1週間前のみ</option>
+          <option value="0,1,7">当日 ＋ 前日 ＋ 1週間前</option>
+        </select>
+      </div>
+    </div>
+    <button class="settings-item" id="btn-gcal-sync">
+      <span class="settings-icon">📅</span>
+      <span class="gcal-sync-label">Googleカレンダーに同期</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <button class="settings-item" id="btn-gcal-clear">
+      <span class="settings-icon">🗑</span>
+      <span>同期情報をクリア（やり直し）</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <button class="settings-item" id="btn-import-backup">
+      <span class="settings-icon">📂</span>
+      <span>バックアップから復元</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <input type="file" id="backup-file" accept=".json" style="display:none">
+    <div class="settings-section-title">その他</div>
+    <button class="settings-item" onclick="window.print()">
+      <span class="settings-icon">🖨️</span>
+      <span>印刷・PDF出力</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+  </div>
+</div>
+
+<!-- ⑦ 農薬マスター -->
+<div class="screen" id="screen-master">
+  <div class="header">
+    <button class="hbtn" id="btn-master-back">←</button>
+    <h1>📦 農薬マスター</h1>
+    <button class="hbtn" id="btn-master-add">＋</button>
+  </div>
+  <div class="scroll-body" style="padding-top:0">
+        <div id="master-list-body" style="padding-top:4px">
+      <div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">農薬が登録されていません<br><span style="font-size:12px">右上の＋で追加できます</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑦b 品種マスター -->
+<div class="screen" id="screen-variety-master">
+  <div class="header">
+    <button class="hbtn" id="btn-variety-master-back">←</button>
+    <h1>🌱 品種マスター</h1>
+    <button class="hbtn" id="btn-variety-master-add">＋</button>
+  </div>
+  <div class="scroll-body" style="padding-top:0">
+    <div id="variety-master-list-body" style="padding-top:4px">
+      <div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-text">品種が登録されていません<br><span style="font-size:12px">右上の＋で追加できます</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 品種マスター追加モーダル -->
+<div class="overlay" id="variety-master-overlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <span class="modal-title-text">品種を登録</span>
+      <button class="mclose" id="variety-master-modal-close">×</button>
+    </div>
+    <div class="modal-body-content">
+      <div class="form-group">
+        <label class="form-label">販売名 ＊</label>
+        <input class="form-input" id="vm-sales" type="text" placeholder="例：桃太郎">
+      </div>
+      <div class="form-group">
+        <label class="form-label">登録品種名</label>
+        <input class="form-input" id="vm-regname" type="text" placeholder="例：桃太郎ＴＭ">
+      </div>
+      <div class="form-group">
+        <label class="form-label">登録番号</label>
+        <input class="form-input" id="vm-regnum" type="text" placeholder="例：第12345号">
+      </div>
+      <!-- 種子消毒 -->
+      <div style="margin:12px 0 6px;border-top:1px solid var(--border);padding-top:12px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;font-size:14px">
+          <input type="checkbox" id="vm-seed-chk" style="width:18px;height:18px;accent-color:var(--green)">
+          種子消毒あり
+        </label>
+      </div>
+      <div id="vm-seed-fields" style="display:none">
+        <div class="form-group">
+          <label class="form-label">有効成分</label>
+          <input class="form-input" id="vm-seed-ingredient" type="text" placeholder="例：チウラム、ベノミル">
+        </div>
+        <div class="form-group">
+          <label class="form-label">処理時期</label>
+          <input class="form-input" id="vm-seed-timing" type="text" placeholder="播種前（種子）">
+        </div>
+      </div>
+      <button class="btn-primary" id="btn-variety-master-save" style="margin-top:4px">登録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⑧ 履歴データインポート -->
+<div class="screen" id="screen-import">
+  <div class="header">
+    <button class="hbtn" id="btn-import-back">←</button>
+    <h1>📊 履歴データ取り込み</h1>
+    <div></div>
+  </div>
+  <div class="scroll-body">
+    <div class="card">
+      <div class="card-title">📋 ファイルの列形式（必須）</div>
+      <div class="card-sub" style="line-height:1.9;margin-top:6px">
+        <strong>品目</strong>　作物名（例：トマト、ナス）<br>
+        <strong>種類</strong>　苗の規格（例：9cm接ぎ、128穴）<br>
+        <strong>播種日</strong>　YYYY-MM-DD 形式<br>
+        <strong>出荷日</strong>　YYYY-MM-DD 形式<br>
+        <span style="color:var(--green)">※ Excelファイル（.xlsx）も対応しています</span>
+      </div>
+    </div>
+
+    <div id="import-drop" class="import-drop" style="margin-bottom:12px">
+      <input type="file" id="import-file" accept=".csv,.xlsx,.xls">
+      <div style="font-size:40px;margin-bottom:8px">📂</div>
+      <div style="font-weight:600;margin-bottom:4px">クリックしてファイルを選択</div>
+      <div style="color:var(--text2);font-size:13px">CSV または Excel (.xlsx)</div>
+    </div>
+
+    <div id="import-preview" style="display:none">
+      <div class="card">
+        <div class="card-title" id="import-preview-title">プレビュー</div>
+        <div id="import-stats" style="margin-top:8px"></div>
+      </div>
+      <button class="btn-primary" id="btn-import-confirm">この内容で取り込む</button>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">現在の統計データ</div>
+      <div id="import-current-stats" style="margin-top:8px;font-size:13px;color:var(--text2)">
+        データなし（取り込むと播種日の提案精度が上がります）
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 日詳細モーダル -->
+<div class="overlay" id="day-overlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <span class="modal-title-text" id="day-modal-title"></span>
+      <button class="mclose" id="day-modal-close">×</button>
+    </div>
+    <div class="modal-body-content" id="day-modal-body"></div>
+  </div>
+</div>
+
+<!-- 農薬マスター追加モーダル -->
+<div class="overlay" id="master-overlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <span class="modal-title-text">農薬を登録</span>
+      <button class="mclose" id="master-modal-close">×</button>
+    </div>
+    <div class="modal-body-content">
+      <div class="form-group">
+        <label class="form-label">農薬名 ＊</label>
+        <input class="form-input" id="m-name" type="text" placeholder="例：アファーム乳剤">
+      </div>
+      <div class="form-group">
+        <label class="form-label">種別</label>
+        <select class="form-select" id="m-type">
+          <option value="">選択（任意）</option>
+          <option>殺虫剤</option><option>殺菌剤</option><option>殺虫殺菌剤</option>
+          <option>除草剤</option><option>植物成長調整剤</option><option>その他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">成分名</label>
+        <input class="form-input" id="m-ingredient" type="text" placeholder="例：クロチアニジン">
+      </div>
+      <div class="form-group">
+        <label class="form-label">メモ</label>
+        <input class="form-input" id="m-memo" type="text" placeholder="備考など">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="margin-bottom:6px">適合野菜（チェックを入れてください）</label>
+        <input class="form-input" id="m-crop-filter" type="text" placeholder="🔍 野菜名で絞り込み（例：トマト）" style="margin-bottom:6px">
+        <div style="display:flex;gap:6px;margin-bottom:4px">
+          <button type="button" id="btn-crop-check-all" style="flex:1;padding:4px;font-size:11px;border:1px solid var(--green);border-radius:6px;background:var(--green-l);cursor:pointer">全選択</button>
+          <button type="button" id="btn-crop-uncheck-all" style="flex:1;padding:4px;font-size:11px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer">全解除</button>
+        </div>
+        <div id="m-crop-checks" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px;background:#fafafa"></div>
+      </div>
+      <button class="btn-primary" id="btn-master-save" style="margin-top:4px">登録する</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js" async></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<script>
+// ── localStorage ヘルパー ──────────────────────────────
+function lsGet(key, def) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
+}
+function lsSet(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+
+// ── 共通作物リスト（注文フォーム品目＋農薬マスター適合野菜で共用）──────
+// 先頭はよく使う品目（注文で使う順）、以降は農水省登録適用リストより
+const ALL_CROPS = [
+  // ── よく使う品目（全角・先頭表示）──
+  "キャベツ","ブロッコリー","ハクサイ","カリフラワー","寒キャベツ",
+  "トマト","ミニトマト","ナス","キュウリ","ピーマン","トウガラシ",
+  "スイカ","メロン","ニガウリ","ナンキン",
+  "エダマメ","トウモロコシ","オクラ","リーフレタス","タマネギ","ネギ",
+  // ── 農水省登録適用リスト（重複除去済み）──
+  "あさつき","あしたば","あすっこ","あぶらな科野菜","いちご","いも類",
+  "うこぎ","うこん","うど","うり科野菜","うり科野菜類","うり類",
+  "えごま","えのきたけ","おかひじき","かぶ","かぼちゃ",
+  "からしな","かんしょ","きのこ類","くきちしゃ","くわい",
+  "こまつな","こんにゃく","ごぼう","さといも","さやいんげん","さやえんどう",
+  "さんとうさい","しいたけ","ししとう","しそ","しそ科葉菜類","しゅんぎく",
+  "しょうが","しょくようほおずき","しろうり","じゅんさい",
+  "すいかの接木用のゆうがお","すいぜんじな","せり","せり科葉菜類",
+  "たけのこ","たらのき","だいこん","つるな","つるむらさき",
+  "とうがらし類","とうがん","なす科野菜","なばな","なばな類",
+  "なめこ","にら","にんじん","にんにく","ねぎ類","のざわな",
+  "はすいも","はつかだいこん","はなっこりー","はなやさい類",
+  "ばれいしょ","ひこしまはるな","ひらたけ","ひろしまな","ふき","ふじまめ",
+  "ふだんそう","ぺぽかぼちゃ","ほうれんそう","まくわうり","まこもたけ",
+  "みずいも","みずな","みつば","みぶな","みょうが","もりあざみ","やなぎたで",
+  "やまのいも","らっきょう","れんこん","わけぎ","わさび","わさびだいこん","わらび",
+  "実えんどう","未成熟ささげ","未成熟そらまめ","未成熟とうもろこし","未成熟ふじまめ",
+  "漬物用すいか","漬物用ﾒﾛﾝ","畑わさび","結球あぶらな科葉菜類","茎ﾌﾞﾛｯｺﾘｰ",
+  "葉ごぼう","葉しょうが","葉たまねぎ","葉にんにく","豆類","野菜類",
+  "非結球あぶらな科葉菜類","非結球ﾒｷｬﾍﾞﾂ","非結球ﾚﾀｽ",
+  "食用おおばこ","食用かえで","食用ぎく","食用さくら","食用せんにちこう",
+  "食用なでしこ","食用へちま","食用べにばな","食用ゆり","食用亜麻","食用桑",
+  "食用西洋たんぽぽ","食用金魚草","食用ｴｷｻﾞｶﾑ","食用ｺｽﾓｽ","食用ｿﾙｶﾞﾑ",
+  "食用ﾄﾚﾆｱ","食用ﾊﾟﾝｼﾞｰ","食用ﾌﾟﾘﾑﾗ","食用ﾍﾟﾝﾀｽ","食用ﾐﾆﾊﾞﾗ",
+  "ｱｽﾊﾟﾗｶﾞｽ","ｴﾝｻｲ","ｴﾝﾀﾞｲﾌﾞ","ｵﾚｶﾞﾉ","ｸﾚｿﾝ","ｹｰﾙ",
+  "ｺﾘｱﾝﾀﾞｰ","ｻﾗﾀﾞ菜","ｽﾞｯｷｰﾆ","ｾｰｼﾞ","ｾﾙﾘｰ","ﾀｱｻｲ","ﾀｲﾑ","ﾀﾗｺﾞﾝ",
+  "ﾁｬｰﾋﾞﾙ","ﾁｺﾘ","ﾁﾝｹﾞﾝｻｲ","ﾃﾞｨﾙ","ﾄﾚﾋﾞｽ","ﾊﾞｼﾞﾙ","ﾊﾟｾﾘ",
+  "ﾋﾟｰﾏﾝ及びとうがらし類","ﾌﾟﾝﾀﾚｯﾗ","ﾏｯｼｭﾙｰﾑ","ﾏｼﾞｮﾗﾑ",
+  "ﾒｷｬﾍﾞﾂ","ﾓﾛﾍｲﾔ","ﾔﾝｸﾞｺｰﾝ","ﾚﾀｽ","ﾚﾓﾝﾊﾞｰﾑ","その他"
+];
+
+const REGISTERED_CROPS = new Set(ALL_CROPS);
+const PEST_TARGET_CROPS = ALL_CROPS.filter(c => c !== 'その他');
+
+// ── 状態 ──────────────────────────────────────────────
+let orders         = [];
+let pestLogs       = [];
+let pestMaster     = [];
+let varietyMaster  = [];
+let leadStats      = {};
+let viewYear       = new Date().getFullYear();
+let viewMonth      = new Date().getMonth() + 1;
+let currentTab     = 'calendar';
+let editingOrderId = null;
+let editingPestId  = null;
+let importParsed   = null;
+let lastSuggest    = null;
+
+// ── データ保存 ────────────────────────────────────────
+function saveOrders()    { lsSet('nae-orders', orders); }
+function savePestLogs()  { lsSet('nae-pestlogs', pestLogs); }
+function savePestMaster(){ lsSet('nae-pestmaster', pestMaster); }
+function saveVarietyMaster(){ lsSet('nae-varietymaster', varietyMaster); }
+function saveLeadStats() { lsSet('nae-leadstats', leadStats); }
+
+// ── 画面切り替え ──────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.bnav-item').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+  const map = {
+    calendar: 'screen-calendar',
+    orders:   'screen-orders',
+    pesticide:'screen-pesticide',
+    settings: 'screen-settings'
+  };
+  showScreen(map[tab]);
+  if (tab === 'orders')   renderOrderList();
+  if (tab === 'pesticide') renderPestList();
+}
+
+// ── タキイ品種マスター初期データ（2026年5月1日現在 登録中・出願中） ──────────
+const TAKII_PRESET_VARIETIES = [
+  // ── トマト（大玉） ──
+  {salesName:'桃太郎サニー',       regName:'TTM011',        regNumber:'18774'},
+  {salesName:'桃太郎ゴールド',     regName:'YE004',         regNumber:'20926'},
+  {salesName:'CF桃太郎はるか',     regName:'TTM017',        regNumber:'21739'},
+  {salesName:'桃太郎グランデ',     regName:'TTM020',        regNumber:'21741'},
+  {salesName:'CFハウス桃太郎',     regName:'TTM045',        regNumber:'23300'},
+  {salesName:'CF桃太郎J',          regName:'TTM046',        regNumber:'23870'},
+  {salesName:'桃太郎ピース',       regName:'TTM076',        regNumber:'27454'},
+  {salesName:'桃太郎ホープ',       regName:'TTM105',        regNumber:'28407'},
+  {salesName:'桃太郎ワンダー',     regName:'TTM111',        regNumber:'28409'},
+  {salesName:'桃太郎みなみ',       regName:'TTM170',        regNumber:'31487'},
+  {salesName:'桃太郎ブライト',     regName:'TTM178',        regNumber:'31490'},
+  // ── トマト（ミニ・中玉） ──
+  {salesName:'フルティカ',         regName:'タキイミディ195', regNumber:'17213'},
+  {salesName:'CF千果',             regName:'TTM019',        regNumber:'21740'},
+  {salesName:'オレンジ千果',       regName:'TTM059',        regNumber:'23301'},
+  // ── カラシナ ──
+  {salesName:'コーラルリーフフェザー', regName:'TTK457',    regNumber:'21194'},
+  // ── イチゴ ──
+  {salesName:'初姫',               regName:'TST184',        regNumber:''},
+  // ── ペチュニア ──
+  {salesName:'ペチュニア ドレスアップ ラベンダー', regName:'ペチュドレ ラベンダー', regNumber:'14803'},
+  {salesName:'ペチュニア ドレスアップ ライム',     regName:'ペチュドレ ライム',     regNumber:'14804'},
+  {salesName:'ペチュニア エポック パープル',        regName:'ペチュエポ パープル',   regNumber:'16626'},
+  {salesName:'ペチュニア ギュギュ ピンクアイス',   regName:'TX642',                 regNumber:'22226'},
+  {salesName:'ペチュニア ギュギュ ピュアホワイト', regName:'TX643',                 regNumber:'22227'},
+  {salesName:'ペチュニア ギュギュ ダブルパープル', regName:'TX681',                 regNumber:'25092'},
+  {salesName:'ペチュニア ギュギュ ダブルイエロー', regName:'TX682',                 regNumber:'25093'},
+  {salesName:'ペチュニア ギュギュ パープル',       regName:'TX714',                 regNumber:'25869'},
+  {salesName:'ペチュニア ギュギュ イエロー',       regName:'TX746',                 regNumber:'26793'},
+  {salesName:'ペチュニア ギュギュ ダブルベリー',   regName:'TX841',                 regNumber:'28302'},
+  {salesName:'ペチュニア ギュギュ ディープバイオレット', regName:'TX840',            regNumber:'28303'},
+  {salesName:'ペチュニア ギュギュ ハニー',         regName:'TX902',                 regNumber:'29130'},
+  {salesName:'ペチュニア ギュギュ ダブルレッド',   regName:'TX933',                 regNumber:'29614'},
+  {salesName:'ペチュニア ラブリースカッシュ',      regName:'TX1034',                regNumber:''},
+  {salesName:'ペチュニア ギュギュ バーガンディー', regName:'TX1075',                regNumber:''},
+  {salesName:'ペチュニア ギュギュ ダブルラベンダーピンク', regName:'TX982',         regNumber:''},
+  {salesName:'ペチュニア ギュギュ ダブルホワイト', regName:'TX1072',                regNumber:''},
+  // ── メランボディウム ──
+  {salesName:'メランボディウム ジャックポット',    regName:'TF757',                 regNumber:'27134'},
+  // ── ラベンダー ──
+  {salesName:'フレンチラベンダー ピンクスター',    regName:'Balavspt900',           regNumber:''},
+  // ── リナリア ──
+  {salesName:'リナリア フィリア ローズ',           regName:'TF697',                 regNumber:'27275'},
+  {salesName:'リナリア フィリア ピンク',           regName:'TF698',                 regNumber:'27276'},
+  {salesName:'リナリア フィリア バイオレット',     regName:'TF699',                 regNumber:'27277'},
+  {salesName:'リナリア フィリア イエロー',         regName:'TF700',                 regNumber:'27278'},
+  {salesName:'リナリア フィリア ホワイト',         regName:'TF701',                 regNumber:'27279'},
+  // ── 観賞用トウガラシ ──
+  {salesName:'観賞用とうがらし オニキスレッド',    regName:'TF802',                 regNumber:'27789'},
+  {salesName:'観賞用とうがらし オニキスマジックオレンジ', regName:'TF994',           regNumber:'30676'},
+  // ── 牧草 ──
+  {salesName:'タチサカエ',         regName:'タチサカエ',    regNumber:'17089'},
+  {salesName:'うし想い',           regName:'JFIR-20',       regNumber:'25486'},
+  {salesName:'ティア・ブレア',     regName:'TC312',         regNumber:'14644'},
+  {salesName:'サツキワセ',         regName:'サツキワセ',    regNumber:'16166'},
+];
+
+// ── 起動 ─────────────────────────────────────────────
+function initApp() {
+  try {
+    // 品目ドロップダウンを共通リストから生成
+    const cropSel = document.getElementById('f-crop');
+    ALL_CROPS.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      cropSel.appendChild(opt);
+    });
+
+    orders     = lsGet('nae-orders', []);
+    pestLogs   = lsGet('nae-pestlogs', []);
+    pestMaster = lsGet('nae-pestmaster', []);
+    varietyMaster = lsGet('nae-varietymaster', []);
+    leadStats  = lsGet('nae-leadstats', {});
+
+    // タキイプリセット品種を未登録分だけ追加
+    let added = 0;
+    TAKII_PRESET_VARIETIES.forEach(preset => {
+      const exists = varietyMaster.some(v =>
+        v.salesName === preset.salesName || v.regName === preset.regName
+      );
+      if (!exists) {
+        varietyMaster.push({
+          id: Date.now() + '_' + Math.random().toString(36).slice(2,7),
+          salesName: preset.salesName,
+          regName:   preset.regName,
+          regNumber: preset.regNumber
+        });
+        added++;
+      }
+    });
+    if (added > 0) lsSet('nae-varietymaster', varietyMaster);
+    renderImportCurrentStats();
+    renderCalendar();
+    showScreen('screen-calendar');
+
+    // 起動時：データが空ならGoogleドライブ復元を促す
+    if (orders.length === 0 && pestLogs.length === 0) {
+      showGdriveRestoreBanner();
+    }
+  } catch(e) {
+    console.error('initApp error:', e);
+    document.getElementById('loading').innerHTML =
+      '<div style="color:red;padding:20px;text-align:center">読み込みエラー<br><small>' + e.message + '</small><br><br><button onclick="location.reload()">再読み込み</button></div>';
+    return;
+  }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('bottom-nav').style.display = 'flex';
+}
+window.addEventListener('DOMContentLoaded', initApp);
+
+// ── バックアップ エクスポート／インポート ────────────
+document.getElementById('btn-export-data').onclick = () => {
+  const data = { orders, pestLogs, pestMaster, varietyMaster, leadStats, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'nae-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+};
+
+// ── Excel/OpenOffice形式エクスポート ────────────────
+document.getElementById('btn-export-excel').onclick = () => {
+  if (typeof XLSX === 'undefined') {
+    alert('Excel書き出し機能を読み込み中です。少し待ってから再度お試しください。');
+    return;
+  }
+  try {
+    const wb = XLSX.utils.book_new();
+
+    // ── 注文シート ──
+    const orderRows = orders.map(o => ({
+      '注文入力日': o.orderDate || '',
+      '注文主': o.customer || '',
+      '品目': o.crop || '',
+      '品種': o.variety || '',
+      '苗規格': o.type || '',
+      '数量': o.qty || '',
+      '播種日': o.sowDate || '',
+      '接ぎ木日': o.graftDate || '',
+      '鉢上げ日': o.potDate || '',
+      '出荷日': o.shipDate || '',
+      '納期': o.delivery || '',
+      'メモ': o.memo || ''
+    }));
+    const wsOrders = XLSX.utils.json_to_sheet(orderRows.length ? orderRows : [{
+      '注文入力日':'','注文主':'','品目':'','品種':'','苗規格':'','数量':'',
+      '播種日':'','接ぎ木日':'','鉢上げ日':'','出荷日':'','納期':'','メモ':''
+    }]);
+    XLSX.utils.book_append_sheet(wb, wsOrders, '注文');
+
+    // ── 農薬散布シート ──
+    const pestRows = pestLogs.map(p => {
+      const cropNames = (p.linkedOrderIds || [])
+        .map(id => orders.find(o => o.id === id)?.crop).filter(Boolean).join('、');
+      return {
+        '散布日': p.date || '',
+        '農薬名': p.pestName || '',
+        '成分名': p.pestIngredient || '',
+        '希釈倍率': p.dilution || '',
+        '対象作物': cropNames,
+        'メモ': p.memo || ''
+      };
+    });
+    const wsPest = XLSX.utils.json_to_sheet(pestRows.length ? pestRows : [{
+      '散布日':'','農薬名':'','成分名':'','希釈倍率':'','対象作物':'','メモ':''
+    }]);
+    XLSX.utils.book_append_sheet(wb, wsPest, '農薬散布');
+
+    // ── 農薬マスターシート ──
+    const masterRows = pestMaster.map(m => ({
+      '農薬名': m.name || '',
+      '成分名': m.ingredient || '',
+      '種別': m.type || '',
+      '希釈倍率': m.dilution || '',
+      'メモ': m.memo || ''
+    }));
+    const wsMaster = XLSX.utils.json_to_sheet(masterRows.length ? masterRows : [{
+      '農薬名':'','成分名':'','種別':'','希釈倍率':'','メモ':''
+    }]);
+    XLSX.utils.book_append_sheet(wb, wsMaster, '農薬マスター');
+
+    const fileName = 'nae-kanri-' + new Date().toISOString().slice(0,10) + '.xlsx';
+    XLSX.writeFile(wb, fileName);
+  } catch(err) {
+    alert('書き出しに失敗しました: ' + err.message);
+  }
+};
+
+// ── Googleドライブ バックアップ ────────────────────────
+const GOAUTH_CLIENT_ID = '458669780454-d0tgla22aah22n5k3eko9vfblc5v06tm.apps.googleusercontent.com';
+const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+let gdriveTokenClient = null;
+let gdriveAccessToken = null;
+let gdrivePendingAction = null; // 'backup' | 'restore'
+
+function initGdrive() {
+  if (!window.google?.accounts?.oauth2) {
+    setTimeout(initGdrive, 500);
+    return;
+  }
+  try {
+    gdriveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOAUTH_CLIENT_ID,
+      scope: GDRIVE_SCOPE,
+      callback: (resp) => {
+        if (resp.error) {
+          alert('認証エラー: ' + resp.error);
+          return;
+        }
+        gdriveAccessToken = resp.access_token;
+        if (gdrivePendingAction === 'backup') doGdriveBackup();
+        else if (gdrivePendingAction === 'restore') doGdriveRestore();
+        else if (gdrivePendingAction === 'photo' && pendingPhotoCtx) {
+          const ctx = pendingPhotoCtx;
+          pendingPhotoCtx = null;
+          processPhotoUpload(ctx.file, ctx.stage, ctx.order, ctx.actualDate);
+        }
+      }
+    });
+  } catch(e) {
+    console.error('GDrive init:', e);
+  }
+}
+window.addEventListener('load', initGdrive);
+
+document.getElementById('btn-gdrive-backup').onclick = () => {
+  if (!gdriveTokenClient) {
+    alert('Google APIの初期化中です。少し待ってから再度お試しください。');
+    return;
+  }
+  gdrivePendingAction = 'backup';
+  if (gdriveAccessToken) doGdriveBackup();
+  else gdriveTokenClient.requestAccessToken();
+};
+
+document.getElementById('btn-gdrive-restore').onclick = () => {
+  if (!gdriveTokenClient) {
+    alert('Google APIの初期化中です。少し待ってから再度お試しください。');
+    return;
+  }
+  gdrivePendingAction = 'restore';
+  if (gdriveAccessToken) doGdriveRestore();
+  else gdriveTokenClient.requestAccessToken();
+};
+
+async function doGdriveBackup() {
+  const btn = document.getElementById('btn-gdrive-backup');
+  const labelEl = btn.querySelector('.gdrive-backup-label');
+  btn.disabled = true;
+  if (labelEl) labelEl.textContent = 'バックアップ中...';
+  try {
+    const data = {
+      orders, pestLogs, pestMaster, varietyMaster, leadStats,
+      exportedAt: new Date().toISOString(),
+      version: 1
+    };
+    const json = JSON.stringify(data, null, 2);
+
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) +
+      '_' + pad(now.getHours()) + pad(now.getMinutes());
+    const fileName = 'nae-backup-' + stamp + '.json';
+
+    const boundary = 'naebound' + Date.now();
+    const metadata = { name: fileName, mimeType: 'application/json',
+      description: '苗生産管理アプリ - 自動バックアップ' };
+    const body =
+      '--' + boundary + '\r\n' +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) + '\r\n' +
+      '--' + boundary + '\r\n' +
+      'Content-Type: application/json\r\n\r\n' +
+      json + '\r\n' +
+      '--' + boundary + '--';
+
+    const res = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      { method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + gdriveAccessToken,
+          'Content-Type': 'multipart/related; boundary=' + boundary
+        },
+        body
+      });
+    if (res.status === 401 || res.status === 403) {
+      // トークン期限切れ or 権限不足 → 再認証
+      gdriveAccessToken = null;
+      if (labelEl) labelEl.textContent = 'Googleドライブにバックアップ';
+      btn.disabled = false;
+      gdrivePendingAction = 'backup';
+      gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+      return;
+    }
+    if (!res.ok) throw new Error('API ' + res.status + ': ' + await res.text());
+    alert('✅ バックアップ成功\nファイル名: ' + fileName + '\n\nGoogleドライブの「マイドライブ」に保存されました。');
+  } catch(e) {
+    alert('バックアップ失敗: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    if (labelEl) labelEl.textContent = 'Googleドライブにバックアップ';
+  }
+}
+
+async function doGdriveRestore() {
+  try {
+    const q = encodeURIComponent("name contains 'nae-backup' and trashed=false");
+    const listRes = await fetch(
+      'https://www.googleapis.com/drive/v3/files?q=' + q +
+      '&orderBy=createdTime desc&fields=files(id,name,createdTime)&pageSize=30',
+      { headers: { 'Authorization': 'Bearer ' + gdriveAccessToken } });
+    if (listRes.status === 401 || listRes.status === 403) {
+      gdriveAccessToken = null;
+      gdrivePendingAction = 'restore';
+      gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+      return;
+    }
+    if (!listRes.ok) throw new Error('API ' + listRes.status + ': ' + await listRes.text());
+    const list = await listRes.json();
+    if (!list.files?.length) {
+      alert('Googleドライブにバックアップファイルが見つかりません');
+      return;
+    }
+    const choices = list.files.map((f, i) =>
+      (i+1) + '. ' + f.name + ' (' + f.createdTime.slice(0,16).replace('T',' ') + ')'
+    ).join('\n');
+    const choice = prompt('復元するバックアップ番号を入力してください（1〜' + list.files.length + '）:\n\n' + choices);
+    if (!choice) return;
+    const idx = parseInt(choice) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= list.files.length) {
+      alert('無効な番号です');
+      return;
+    }
+    const file = list.files[idx];
+    if (!confirm('「' + file.name + '」から復元しますか？\n現在のデータはすべて上書きされます。')) return;
+
+    const dlRes = await fetch(
+      'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media',
+      { headers: { 'Authorization': 'Bearer ' + gdriveAccessToken } });
+    if (!dlRes.ok) throw new Error('Download failed');
+    const data = await dlRes.json();
+
+    if (Array.isArray(data.orders))     { orders = data.orders;         lsSet('nae-orders', orders); }
+    if (Array.isArray(data.pestLogs))   { pestLogs = data.pestLogs;     savePestLogs(); }
+    if (Array.isArray(data.pestMaster)) { pestMaster = data.pestMaster; savePestMaster(); }
+    if (Array.isArray(data.varietyMaster)) { varietyMaster = data.varietyMaster; saveVarietyMaster(); }
+    if (data.leadStats && typeof data.leadStats === 'object') { leadStats = data.leadStats; saveLeadStats(); }
+
+    renderCalendar();
+    alert('✅ 復元完了\n注文: ' + (data.orders?.length || 0) + '件\n農薬: ' + (data.pestLogs?.length || 0) + '件');
+  } catch(e) {
+    alert('復元失敗: ' + e.message);
+  }
+}
+
+// 起動時復元バナー
+function showGdriveRestoreBanner() {
+  const banner = document.getElementById('gdrive-restore-banner');
+  if (!banner) return;
+  banner.style.display = 'flex';
+
+  document.getElementById('btn-restore-banner').onclick = () => {
+    banner.style.display = 'none';
+    if (!gdriveTokenClient) {
+      alert('Google APIの初期化中です。少し待ってから再度お試しください。');
+      return;
+    }
+    gdrivePendingAction = 'restore';
+    if (gdriveAccessToken) doGdriveRestore();
+    else gdriveTokenClient.requestAccessToken();
+  };
+
+  document.getElementById('btn-restore-banner-close').onclick = () => {
+    banner.style.display = 'none';
+  };
+}
+
+// ページ非表示・終了時に自動バックアップ
+let autoBackupDone = false;
+async function autoBackupSilent() {
+  if (autoBackupDone) return;
+  if (!gdriveAccessToken) return;
+  if (orders.length === 0 && pestLogs.length === 0) return;
+  autoBackupDone = true;
+  try {
+    const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    const stamp = now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) +
+                  '_' + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
+    const fileName = 'nae-backup_' + stamp + '.json';
+    const payload = JSON.stringify({ orders, pestLogs, pestMaster, varietyMaster, leadStats });
+    const boundary = 'bauto' + Date.now();
+    const meta = JSON.stringify({ name: fileName, mimeType: 'application/json' });
+    const body = '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + meta +
+                 '\r\n--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + payload +
+                 '\r\n--' + boundary + '--';
+    await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      { method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + gdriveAccessToken,
+          'Content-Type': 'multipart/related; boundary=' + boundary
+        },
+        body
+      });
+  } catch(e) {
+    // サイレント失敗
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') autoBackupSilent();
+});
+window.addEventListener('pagehide', () => autoBackupSilent());
+
+// ── Googleカレンダー通知連携 ──────────────────────────
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+let gcalTokenClient = null;
+let gcalAccessToken = null;
+let gcalSyncMap = lsGet('nae-gcal-sync', {});
+let gcalReminderCfg = lsGet('nae-gcal-cfg', { enabled: true, hour: 8, daysBefore: [1] });
+
+// 設定UIの初期値復元 & 変更時の保存
+(function initReminderUi(){
+  const enableEl = document.getElementById('gcal-reminder-enable');
+  const hourEl   = document.getElementById('gcal-reminder-hour');
+  const whenEl   = document.getElementById('gcal-reminder-when');
+  if (!enableEl) return;
+  enableEl.checked = gcalReminderCfg.enabled;
+  hourEl.value     = String(gcalReminderCfg.hour);
+  whenEl.value     = gcalReminderCfg.daysBefore.join(',');
+  const save = () => {
+    gcalReminderCfg = {
+      enabled: enableEl.checked,
+      hour: parseInt(hourEl.value, 10),
+      daysBefore: whenEl.value.split(',').map(s => parseInt(s, 10))
+    };
+    lsSet('nae-gcal-cfg', gcalReminderCfg);
+  };
+  enableEl.onchange = save;
+  hourEl.onchange   = save;
+  whenEl.onchange   = save;
+})();
+
+function initGcal() {
+  if (!window.google?.accounts?.oauth2) {
+    setTimeout(initGcal, 500);
+    return;
+  }
+  try {
+    gcalTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOAUTH_CLIENT_ID,
+      scope: GCAL_SCOPE,
+      callback: (resp) => {
+        if (resp.error) { alert('カレンダー認証エラー: ' + resp.error); return; }
+        gcalAccessToken = resp.access_token;
+        doGcalSync();
+      }
+    });
+  } catch(e) { console.error('GCal init:', e); }
+}
+window.addEventListener('load', initGcal);
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function buildReminders() {
+  if (!gcalReminderCfg.enabled) return { useDefault: false, overrides: [] };
+  const overrides = gcalReminderCfg.daysBefore.map(d => ({
+    method: 'popup',
+    minutes: d * 24 * 60 // d日前のイベント時刻に通知（0=当日）
+  }));
+  return { useDefault: false, overrides };
+}
+
+function buildTimedEvent(dateStr, summary, description) {
+  const h = gcalReminderCfg.hour;
+  const start = dateStr + 'T' + pad2(h) + ':00:00';
+  const end   = dateStr + 'T' + pad2(h+1) + ':00:00';
+  return {
+    summary, description,
+    start: { dateTime: start, timeZone: 'Asia/Tokyo' },
+    end:   { dateTime: end,   timeZone: 'Asia/Tokyo' },
+    reminders: buildReminders()
+  };
+}
+
+async function gcalUpsertEvent(syncKey, event) {
+  const existingId = gcalSyncMap[syncKey];
+  if (existingId) {
+    const res = await fetch(
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events/' + existingId,
+      { method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + gcalAccessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify(event) });
+    if (res.ok) return await res.json();
+    if (res.status === 401 || res.status === 403) throw new Error('AUTH');
+    if (res.status === 404) delete gcalSyncMap[syncKey]; // recreate
+    else throw new Error('API ' + res.status);
+  }
+  const res = await fetch(
+    'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+    { method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + gcalAccessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify(event) });
+  if (res.status === 401 || res.status === 403) throw new Error('AUTH');
+  if (!res.ok) throw new Error('API ' + res.status + ': ' + await res.text());
+  const r = await res.json();
+  gcalSyncMap[syncKey] = r.id;
+  lsSet('nae-gcal-sync', gcalSyncMap);
+  return r;
+}
+
+document.getElementById('btn-gcal-sync').onclick = () => {
+  if (!gcalTokenClient) { alert('Google APIの初期化中です。少し待ってから再度お試しください。'); return; }
+  if (gcalAccessToken) doGcalSync();
+  else gcalTokenClient.requestAccessToken();
+};
+
+document.getElementById('btn-gcal-clear').onclick = () => {
+  if (!confirm('同期情報をクリアします。\nアプリ側の紐づけが消えますが、Googleカレンダーに既に登録されているイベントは削除されません。')) return;
+  gcalSyncMap = {};
+  lsSet('nae-gcal-sync', gcalSyncMap);
+  alert('同期情報をクリアしました');
+};
+
+async function doGcalSync() {
+  const btn = document.getElementById('btn-gcal-sync');
+  const labelEl = btn.querySelector('.gcal-sync-label');
+  btn.disabled = true;
+  let count = 0, errors = 0;
+  const errorMsgs = [];
+
+  try {
+    // 注文の各日付をイベント化（過去日付は通知不要なのでスキップ）
+    const todayStr = today();
+    for (const o of orders) {
+      const fields = [
+        { key: 'sow',   label: '播種',   date: o.sowDate,   icon: '🌱' },
+        { key: 'graft', label: '接ぎ木', date: o.graftDate, icon: '🪡' },
+        { key: 'pot',   label: '鉢上げ', date: o.potDate,   icon: '🪴' },
+        { key: 'ship',  label: '出荷',   date: o.shipDate || o.delivery, icon: '📦' }
+      ];
+      for (const f of fields) {
+        if (!f.date) continue;
+        const syncKey = 'order:' + o.id + ':' + f.key;
+        const qty = o.qty ? ' ' + o.qty : '';
+        const variety = o.variety ? '（' + o.variety + '）' : '';
+        const summary = f.icon + ' ' + f.label + ' ' + o.crop + variety + qty;
+        const description = [
+          o.customer ? '注文主: ' + o.customer : '',
+          o.type ? '苗規格: ' + o.type : '',
+          o.qty ? '数量: ' + o.qty : '',
+          o.memo ? 'メモ: ' + o.memo : '',
+          '',
+          '— 苗生産管理アプリ'
+        ].filter(s => s !== undefined).join('\n');
+        const event = buildTimedEvent(f.date, summary, description);
+        if (labelEl) labelEl.textContent = '同期中... ' + (++count) + '件';
+        try {
+          await gcalUpsertEvent(syncKey, event);
+        } catch(e) {
+          if (e.message === 'AUTH') {
+            gcalAccessToken = null;
+            gcalTokenClient.requestAccessToken({ prompt: 'consent' });
+            return;
+          }
+          errors++;
+          if (errorMsgs.length < 3) errorMsgs.push(e.message);
+          console.error('GCal sync error:', syncKey, e);
+        }
+      }
+    }
+
+    // 農薬散布記録を同期
+    for (const p of pestLogs) {
+      if (!p.date) continue;
+      const syncKey = 'pest:' + p.id;
+      const crops = (p.linkedOrderIds || [])
+        .map(id => orders.find(o => o.id === id)?.crop).filter(Boolean).join('、');
+      const summary = '💊 農薬散布 ' + (p.pestName || '');
+      const description = [
+        p.pestIngredient ? '成分: ' + p.pestIngredient : '',
+        p.dilution ? '希釈倍率: ' + p.dilution : '',
+        crops ? '対象作物: ' + crops : '',
+        p.memo ? 'メモ: ' + p.memo : '',
+        '',
+        '— 苗生産管理アプリ'
+      ].filter(Boolean).join('\n');
+      const event = buildTimedEvent(p.date, summary, description);
+      if (labelEl) labelEl.textContent = '同期中... ' + (++count) + '件';
+      try {
+        await gcalUpsertEvent(syncKey, event);
+      } catch(e) {
+        if (e.message === 'AUTH') {
+          gcalAccessToken = null;
+          gcalTokenClient.requestAccessToken({ prompt: 'consent' });
+          return;
+        }
+        errors++;
+        if (errorMsgs.length < 3) errorMsgs.push(e.message);
+        console.error('GCal sync error:', syncKey, e);
+      }
+    }
+
+    let msg = '✅ 同期完了\n成功: ' + count + '件';
+    if (gcalReminderCfg.enabled) {
+      const hh = pad2(gcalReminderCfg.hour) + ':00';
+      const labels = gcalReminderCfg.daysBefore.map(d => d === 0 ? '当日' : d + '日前').join('・');
+      msg += '\n通知: ' + labels + ' ' + hh;
+    }
+    if (errors > 0) msg += '\n\nエラー: ' + errors + '件\n' + errorMsgs.join('\n');
+    alert(msg);
+  } catch(e) {
+    alert('同期エラー: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    if (labelEl) labelEl.textContent = 'Googleカレンダーに同期';
+  }
+}
+
+document.getElementById('btn-import-backup').onclick = () =>
+  document.getElementById('backup-file').click();
+
+document.getElementById('backup-file').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!confirm('バックアップから復元します。現在のデータは上書きされます。よろしいですか？')) return;
+      if (Array.isArray(data.orders))    { orders = data.orders;       saveOrders(); }
+      if (Array.isArray(data.pestLogs))  { pestLogs = data.pestLogs;   savePestLogs(); }
+      if (Array.isArray(data.pestMaster)){ pestMaster = data.pestMaster; savePestMaster(); }
+      if (Array.isArray(data.varietyMaster)){ varietyMaster = data.varietyMaster; saveVarietyMaster(); }
+      if (data.leadStats && typeof data.leadStats === 'object') { leadStats = data.leadStats; saveLeadStats(); }
+      renderImportCurrentStats();
+      renderCalendar();
+      alert('✅ 復元が完了しました！');
+    } catch { alert('ファイルの読み込みに失敗しました。'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// ── ユーティリティ ────────────────────────────────────
+// 日付をローカル時刻で YYYY-MM-DD に変換（タイムゾーンずれ防止）
+function dateToLocal(d) {
+  const y  = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${dy}`;
+}
+// "YYYY-MM-DD" 文字列をローカル時刻として Date に変換
+function parseLocalDate(s) {
+  if (!s) return null;
+  const [y, mo, d] = s.split('-').map(Number);
+  return new Date(y, mo - 1, d);
+}
+function addDays(s, n) {
+  const d = parseLocalDate(s);
+  d.setDate(d.getDate() + n);
+  return dateToLocal(d);
+}
+function subDays(s, n) { return addDays(s, -n); }
+function fmtJP(s) {
+  if (!s) return '';
+  const [, m, d] = s.split('-');
+  return `${parseInt(m)}月${parseInt(d)}日`;
+}
+function today() { return dateToLocal(new Date()); }
+
+function normalizeType(t) {
+  if (!t) return '—';
+  t = t.replace(/㎝/g, 'cm').replace(/\s+/g, '').toLowerCase();
+  if (/接ぎ|接木/.test(t)) {
+    const m = t.match(/(\d+(?:\.\d+)?)cm/);
+    return m ? `${m[1]}cm接ぎ` : '接ぎ木';
+  }
+  if (/実生/.test(t)) {
+    const m = t.match(/(\d+(?:\.\d+)?)cm/);
+    return m ? `${m[1]}cm実生` : '実生';
+  }
+  if (/128/.test(t)) return '128穴';
+  if (/200穴/.test(t)) return '200穴';
+  if (/72穴/.test(t))  return '72穴';
+  return t;
+}
+
+function getSeason(dateStr) {
+  const m = parseLocalDate(dateStr).getMonth() + 1;
+  if (m >= 3 && m <= 5) return '春';
+  if (m >= 6 && m <= 8) return '夏';
+  if (m >= 9 && m <= 11) return '秋';
+  return '冬';
+}
+
+function statsKey(crop, type, season) {
+  const parts = [crop, normalizeType(type)];
+  if (season) parts.push(season);
+  return parts.join('__').replace(/[^a-zA-Z0-9ぁ-ん一-龯ァ-ン_]/g, '_');
+}
+
+// 4年分(2023-2026)の栽培履歴から算出した季節別リードタイム統計
+const SEASONAL_STATS = {
+  "アスパラガス__9cm実生__春":{avg:61,min:61,max:61,count:1},
+  "ウリ類__9cm接ぎ__夏":{avg:40,min:40,max:40,count:1},
+  "ウリ類__9cm接ぎ__春":{avg:32,min:23,max:36,count:3},
+  "カリフラワー__128穴__夏":{avg:35,min:35,max:35,count:1},
+  "キャベツ____夏":{avg:27,min:27,max:27,count:1},
+  "キャベツ____秋":{avg:38,min:29,max:52,count:5},
+  "キャベツ__128dp__春":{avg:32,min:32,max:32,count:1},
+  "キャベツ__128穴__秋":{avg:30,min:23,max:53,count:34},
+  "キャベツ__128穴__冬":{avg:47,min:43,max:55,count:4},
+  "キュウリ____夏":{avg:23,min:19,max:26,count:5},
+  "キュウリ__9cm実生__夏":{avg:26,min:19,max:31,count:8},
+  "キュウリ__9cm実生__春":{avg:33,min:24,max:53,count:8},
+  "キュウリ__9cm接ぎ__夏":{avg:21,min:14,max:27,count:15},
+  "キュウリ__9cm接ぎ__春":{avg:35,min:20,max:51,count:21},
+  "キュウリ__9cm接ぎ__冬":{avg:29,min:22,max:38,count:9},
+  "キュウリ__実生__夏":{avg:15,min:14,max:16,count:3},
+  "キュウリ__実生__春":{avg:20,min:19,max:21,count:2},
+  "シシトウ__9cm実生__春":{avg:68,min:54,max:97,count:4},
+  "シシトウ__9cm接ぎ__春":{avg:96,min:95,max:97,count:5},
+  "スイカ__9cm接ぎ__春":{avg:35,min:29,max:45,count:9},
+  "トウガラシ__10_5cm実生__春":{avg:24,min:18,max:29,count:2},
+  "トウガラシ__9cm実生__夏":{avg:46,min:46,max:46,count:1},
+  "トウガラシ__9cm実生__春":{avg:67,min:30,max:100,count:24},
+  "トウガラシ__9cm実生__冬":{avg:50,min:50,max:50,count:2},
+  "トウガラシ__9cm接ぎ__春":{avg:75,min:69,max:81,count:2},
+  "トウガラシ__実生__春":{avg:28,min:28,max:28,count:1},
+  "トウモロコシ__128dp__春":{avg:21,min:19,max:22,count:7},
+  "トマト____春":{avg:78,min:76,max:82,count:4},
+  "トマト__128dp__夏":{avg:22,min:22,max:22,count:1},
+  "トマト__128dp__春":{avg:28,min:28,max:28,count:1},
+  "トマト__12cm実生__春":{avg:71,min:71,max:71,count:1},
+  "トマト__9cm実生__夏":{avg:42,min:42,max:42,count:1},
+  "トマト__9cm実生__春":{avg:73,min:68,max:75,count:4},
+  "トマト__9cm実生__冬":{avg:49,min:31,max:67,count:4},
+  "トマト__9cm接ぎ__夏":{avg:38,min:20,max:73,count:12},
+  "トマト__9cm接ぎ__春":{avg:59,min:31,max:87,count:60},
+  "トマト__9cm接ぎ__冬":{avg:43,min:22,max:87,count:71},
+  "トマト__実生__夏":{avg:38,min:38,max:39,count:2},
+  "トマト__実生__春":{avg:32,min:24,max:61,count:6},
+  "トマト__接ぎ木__春":{avg:32,min:28,max:34,count:4},
+  "トマト__接ぎ木__冬":{avg:44,min:44,max:44,count:2},
+  "ナス____春":{avg:91,min:91,max:91,count:1},
+  "ナス__9cm実生__夏":{avg:26,min:15,max:38,count:2},
+  "ナス__9cm実生__春":{avg:66,min:51,max:81,count:2},
+  "ナス__9cm接ぎ__夏":{avg:92,min:88,max:96,count:4},
+  "ナス__9cm接ぎ__春":{avg:79,min:29,max:122,count:56},
+  "ナス__9cm接ぎ__冬":{avg:62,min:53,max:73,count:14},
+  "ナス__実生__春":{avg:46,min:41,max:50,count:2},
+  "ナス__接ぎ木__春":{avg:55,min:48,max:65,count:4},
+  "ナンキン__9cm実生__夏":{avg:20,min:20,max:20,count:2},
+  "ナンキン__9cm実生__春":{avg:19,min:19,max:19,count:1},
+  "ニガウリ__9cm実生__春":{avg:17,min:17,max:17,count:1},
+  "ニガウリ__9cm実生__冬":{avg:46,min:46,max:46,count:1},
+  "ネギ__128穴__夏":{avg:120,min:120,max:120,count:1},
+  "ハクサイ__128dp__春":{avg:26,min:24,max:30,count:4},
+  "ハクサイ__128dp__冬":{avg:30,min:27,max:36,count:3},
+  "ハクサイ__128穴__夏":{avg:23,min:23,max:23,count:1},
+  "ハクサイ__128穴__秋":{avg:23,min:15,max:34,count:26},
+  "ハクサイ__128穴__春":{avg:27,min:25,max:30,count:5},
+  "ピーマン____春":{avg:64,min:38,max:91,count:2},
+  "ピーマン__10_5cm接ぎ__春":{avg:96,min:96,max:96,count:1},
+  "ピーマン__12cm実生__春":{avg:119,min:118,max:121,count:5},
+  "ピーマン__12cm実生__冬":{avg:58,min:58,max:58,count:2},
+  "ピーマン__9cm実生__春":{avg:69,min:35,max:97,count:21},
+  "ピーマン__9cm実生__冬":{avg:49,min:49,max:49,count:2},
+  "ピーマン__9cm接ぎ__春":{avg:79,min:39,max:104,count:21},
+  "ピーマン__9cm接ぎ__冬":{avg:63,min:42,max:102,count:8},
+  "ブロッコリー____秋":{avg:34,min:29,max:40,count:4},
+  "ブロッコリー____春":{avg:41,min:38,max:43,count:3},
+  "ブロッコリー____冬":{avg:42,min:38,max:44,count:3},
+  "ブロッコリー__128sh__春":{avg:34,min:32,max:37,count:2},
+  "ブロッコリー__128sh__冬":{avg:40,min:32,max:45,count:3},
+  "ブロッコリー__128穴__夏":{avg:30,min:23,max:43,count:21},
+  "ブロッコリー__128穴__秋":{avg:31,min:23,max:47,count:95},
+  "ブロッコリー__128穴__春":{avg:42,min:33,max:60,count:26},
+  "ブロッコリー__128穴__冬":{avg:43,min:34,max:52,count:21},
+  "ミニトマト____春":{avg:67,min:22,max:82,count:4},
+  "ミニトマト____冬":{avg:39,min:39,max:39,count:1},
+  "ミニトマト__128dp__夏":{avg:22,min:22,max:22,count:1},
+  "ミニトマト__128dp__春":{avg:28,min:28,max:28,count:1},
+  "ミニトマト__9cm実生__夏":{avg:23,min:18,max:33,count:3},
+  "ミニトマト__9cm実生__春":{avg:58,min:29,max:80,count:10},
+  "ミニトマト__9cm実生__冬":{avg:31,min:31,max:31,count:1},
+  "ミニトマト__9cm接ぎ__夏":{avg:35,min:28,max:38,count:6},
+  "ミニトマト__9cm接ぎ__春":{avg:68,min:18,max:87,count:17},
+  "ミニトマト__9cm接ぎ__冬":{avg:44,min:23,max:83,count:21},
+  "ミニトマト__接ぎ木__冬":{avg:44,min:44,max:44,count:2},
+  "メロン__9cm接ぎ__春":{avg:26,min:20,max:39,count:6},
+  "リーフレタス____秋":{avg:24,min:24,max:24,count:1},
+  "リーフレタス____冬":{avg:29,min:29,max:29,count:1},
+  "ロマネスコ__128穴__秋":{avg:30,min:30,max:30,count:1},
+  "寒キャベツ____秋":{avg:29,min:29,max:29,count:1},
+  "寒キャベツ__128穴__夏":{avg:28,min:22,max:37,count:8},
+  "寒キャベツ__128穴__秋":{avg:27,min:22,max:31,count:10},
+  "良質キャベツ__128穴__夏":{avg:32,min:32,max:32,count:1},
+  "良質キャベツ__128穴__秋":{avg:45,min:45,max:45,count:1}
+};
+
+const DEFAULT_LEADS = {
+  'キャベツ':31,'ブロッコリー':31,'ハクサイ':23,'カリフラワー':30,
+  'トマト':64,'ミニトマト':48,'ナス':89,'キュウリ':29,
+  'ピーマン':85,'トウガラシ':76,'スイカ':54,'メロン':40,
+  'ニガウリ':50,'ナンキン':20,'エダマメ':21,'オクラ':30,
+  'リーフレタス':28,'タマネギ':35,'ネギ':112,'寒キャベツ':27,
+};
+
+const GRAFT_DAYS = {
+  'キュウリ':12,'スイカ':21,'トマト':27,'ナス':44,
+  'ピーマン':37,'ミニトマト':28,'メロン':18,'ニガウリ':20,'トウガラシ':30
+};
+
+function isGraft(type) { return type ? /接ぎ|接木/i.test(type) : false; }
+
+// ── 播種日提案 ────────────────────────────────────────
+function calcSuggest(crop, type, delivery) {
+  if (!crop || !delivery) return null;
+
+  const season  = getSeason(delivery);
+  const keyS    = statsKey(crop, type, season);   // 季節あり
+  const keyBase = statsKey(crop, type);            // 季節なし（既存Firestoreデータ用）
+
+  // 優先順位: ①Firestore季節あり → ②内蔵SEASONAL_STATS → ③Firestore季節なし → ④DEFAULT_LEADS
+  let avgDays, note;
+  const statS = leadStats[keyS];
+  const statB = leadStats[keyBase];
+
+  if (statS && statS.count >= 1) {
+    avgDays = Math.round(statS.avg);
+    note = `📊 【${season}】取り込みデータ ${statS.count}件（平均${avgDays}日前、範囲：${statS.min}〜${statS.max}日前）`;
+  } else if (SEASONAL_STATS[keyS]) {
+    const bs = SEASONAL_STATS[keyS];
+    avgDays = bs.avg;
+    note = `📊 【${season}】過去4年の実績 ${bs.count}件（平均${avgDays}日前、範囲：${bs.min}〜${bs.max}日前）`;
+  } else if (statB && statB.count >= 2) {
+    avgDays = Math.round(statB.avg);
+    note = `📊 取り込みデータ ${statB.count}件（平均${avgDays}日前、季節別データなし）`;
+  } else {
+    // 他の季節のSEASONAL_STATSを参照
+    const normT = normalizeType(type);
+    const anyKey = Object.keys(SEASONAL_STATS).find(k => k.startsWith(`${crop}__${normT}__`));
+    if (anyKey) {
+      const bs = SEASONAL_STATS[anyKey];
+      avgDays = bs.avg;
+      note = `📊 【${bs.season || '参考'}】実績データ ${bs.count}件（平均${avgDays}日前 ※${season}の実績は未登録）`;
+    } else {
+      const defaultEntry = Object.entries(DEFAULT_LEADS).find(([k]) => crop.includes(k));
+      avgDays = defaultEntry ? defaultEntry[1] : 30;
+      note = `⚠️ 過去データなし。標準値 ${avgDays}日を使用。「設定 → 栽培履歴データ取り込み」で精度が上がります。`;
+    }
+  }
+
+  const sow = subDays(delivery, avgDays);
+  let graft = null;
+  if (isGraft(type)) {
+    const g = Object.entries(GRAFT_DAYS).find(([k]) => crop.includes(k));
+    if (g) graft = addDays(sow, g[1]);
+  }
+  return { sow, graft, ship: delivery, note };
+}
+
+// ── カレンダー ────────────────────────────────────────
+document.getElementById('btn-prev').onclick = () => {
+  if (--viewMonth < 1) { viewMonth = 12; viewYear--; }
+  renderCalendar();
+};
+document.getElementById('btn-next').onclick = () => {
+  if (++viewMonth > 12) { viewMonth = 1; viewYear++; }
+  renderCalendar();
+};
+document.getElementById('btn-today').onclick = () => {
+  const n = new Date(); viewYear = n.getFullYear(); viewMonth = n.getMonth() + 1;
+  renderCalendar();
+};
+
+function renderCalendar() {
+  document.getElementById('month-title').textContent = `${viewYear}年 ${viewMonth}月`;
+  const grid     = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  const todayStr = today();
+  const firstDow = (new Date(viewYear, viewMonth - 1, 1).getDay() + 6) % 7;
+  const lastDay  = new Date(viewYear, viewMonth, 0).getDate();
+
+  const dayMap = {};
+  const addEv = (dateStr, ev) => {
+    if (!dateStr) return;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (y === viewYear && m === viewMonth) {
+      (dayMap[d] = dayMap[d] || []).push(ev);
+    }
+  };
+
+  for (const o of orders) {
+    if (o.sowDate)   addEv(o.sowDate,   { type: '播種',  label: o.crop, id: o.id, order: o });
+    if (o.graftDate) addEv(o.graftDate, { type: '接ぎ木', label: o.crop, id: o.id, order: o });
+    addEv(o.shipDate || o.delivery,     { type: '出荷',  label: o.crop, id: o.id, order: o });
+  }
+  for (const p of pestLogs) {
+    addEv(p.date, { type: '農薬', label: p.pestName || '農薬', log: p });
+  }
+
+  for (let i = 0; i < firstDow; i++) {
+    const c = document.createElement('div');
+    c.className = 'cal-cell empty';
+    grid.appendChild(c);
+  }
+
+  for (let d = 1; d <= lastDay; d++) {
+    const dateStr = `${viewYear}-${String(viewMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = (new Date(viewYear, viewMonth - 1, d).getDay() + 6) % 7;
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' +
+      (dateStr === todayStr ? ' today' : '') +
+      (dow === 5 ? ' sat' : dow === 6 ? ' sun' : '');
+
+    const num = document.createElement('div');
+    num.className = 'day-num';
+    num.textContent = d;
+    cell.appendChild(num);
+
+    const evs = dayMap[d] || [];
+    evs.slice(0, 3).forEach(ev => {
+      const tag = document.createElement('div');
+      tag.className = `ev-tag ${ev.type}`;
+      tag.textContent = `${ev.type[0]} ${ev.label}`;
+      cell.appendChild(tag);
+    });
+    if (evs.length > 3) {
+      const more = document.createElement('div');
+      more.className = 'more-badge';
+      more.textContent = `+${evs.length - 3}`;
+      cell.appendChild(more);
+    }
+    cell.onclick = () => openDayModal(d, evs, dateStr);
+    grid.appendChild(cell);
+  }
+}
+
+// ── 日詳細モーダル ────────────────────────────────────
+function openDayModal(d, evs, dateStr) {
+  if (!evs.length) return;
+  document.getElementById('day-modal-title').textContent = `${viewYear}年${viewMonth}月${d}日`;
+  const body = document.getElementById('day-modal-body');
+  body.innerHTML = '';
+  evs.forEach(ev => {
+    const card = document.createElement('div');
+    card.className = `ev-card ${ev.type}`;
+    const sub = ev.order
+      ? `${ev.order.qty ? ev.order.qty + '　' : ''}${ev.order.customer || ''}`
+      : (ev.log ? (ev.log.pestIngredient || '') : '');
+    card.innerHTML = `
+      <div class="ev-card-type">【${ev.type}】</div>
+      <div class="ev-card-main">${ev.label}</div>
+      ${sub ? `<div class="ev-card-sub">${sub}</div>` : ''}`;
+    if (ev.order) card.onclick = () => {
+      document.getElementById('day-overlay').classList.remove('open');
+      openOrderForm(ev.order);
+    };
+    body.appendChild(card);
+  });
+  document.getElementById('day-overlay').classList.add('open');
+}
+document.getElementById('day-modal-close').onclick =
+  () => document.getElementById('day-overlay').classList.remove('open');
+document.getElementById('day-overlay').onclick =
+  e => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('open'); };
+
+// ── 注文フォーム ──────────────────────────────────────
+function openOrderForm(order = null) {
+  editingOrderId = order?.id ?? null;
+  document.getElementById('order-form-title').textContent = order ? '注文を編集' : '注文を追加';
+  document.getElementById('btn-order-delete').style.display = order ? '' : 'none';
+  document.getElementById('f-orderDate').value = order?.orderDate ?? today();
+  document.getElementById('f-customer').value = order?.customer ?? '';
+  document.getElementById('f-phone').value    = order?.phone ?? '';
+  // SMS/写真報告ボタンの表示制御（保存済みの注文かつ電話番号入力済みの場合のみ）
+  document.getElementById('order-sms-actions').style.display = (order && order.phone) ? '' : 'none';
+  document.getElementById('sms-actual-date').value = today();
+  document.getElementById('f-crop').value     = order?.crop ?? '';
+  // 品種（接ぎ木：穂木・台木 / その他：単一）
+  const _legacy = (order?.variety ?? '').split('×');
+  const _type = order?.type ?? '';
+  document.getElementById('f-type').value = _type;
+  // セレクトに同じ値があれば選択、なければ「直接入力」
+  const _sel = document.getElementById('f-type-sel');
+  const _opt = [..._sel.options].find(o => o.value === _type && o.value !== '__custom__');
+  if (_type === '') {
+    _sel.value = ''; document.getElementById('f-type').style.display = 'none';
+  } else if (_opt) {
+    _sel.value = _type; document.getElementById('f-type').style.display = 'none';
+  } else {
+    _sel.value = '__custom__'; document.getElementById('f-type').style.display = '';
+  }
+  const _graft = isGraft(_type);
+  document.getElementById('variety-row-single').style.display = _graft ? 'none' : '';
+  document.getElementById('variety-row-graft').style.display  = _graft ? '' : 'none';
+  if (_graft) {
+    document.getElementById('f-variety-scion').value = order?.varietyScion ?? (_legacy[0] ?? '').trim();
+    document.getElementById('f-variety-stock').value = order?.varietyStock ?? (_legacy[1] ?? '').trim();
+    document.getElementById('f-variety-single').value = '';
+  } else {
+    document.getElementById('f-variety-single').value = order?.variety ?? order?.varietyScion ?? (_legacy[0] ?? '').trim();
+    document.getElementById('f-variety-scion').value = '';
+    document.getElementById('f-variety-stock').value = '';
+  }
+  document.getElementById('f-qty').value      = order?.qty ?? '';
+  document.getElementById('f-price').value    = order?.price ?? '';
+  document.getElementById('f-delivery').value = order?.delivery ?? today();
+  document.getElementById('f-sow').value      = order?.sowDate ?? '';
+  document.getElementById('f-graft').value    = order?.graftDate ?? '';
+  document.getElementById('f-ship').value     = order?.shipDate ?? '';
+  document.getElementById('f-pot').value      = order?.potDate ?? '';
+  document.getElementById('f-memo').value     = order?.memo ?? '';
+  document.getElementById('f-seed-ordered').checked = order?.seedOrdered ?? false;
+  document.getElementById('btn-print-hist').style.display = order ? '' : 'none';
+  lastSuggest = null;
+  updateSuggest();
+  renderVarietySuggests();
+  showScreen('screen-order-form');
+}
+
+function updateSuggest() {
+  const crop     = document.getElementById('f-crop').value;
+  const type     = document.getElementById('f-type').value;
+  const delivery = document.getElementById('f-delivery').value;
+  const box      = document.getElementById('sow-suggest-box');
+  if (!crop || !delivery) { box.style.display = 'none'; return; }
+
+  lastSuggest = calcSuggest(crop, type, delivery);
+  if (!lastSuggest) { box.style.display = 'none'; return; }
+
+  box.style.display = 'block';
+  const season = getSeason(delivery);
+  document.getElementById('sug-header').textContent = `📊 【${season}】播種日提案`;
+  document.getElementById('sug-sow-date').textContent  = fmtJP(lastSuggest.sow);
+  document.getElementById('sug-ship-date').textContent = fmtJP(lastSuggest.ship);
+  document.getElementById('sug-note').textContent = lastSuggest.note;
+  const graftRow = document.getElementById('sug-graft-row');
+  if (lastSuggest.graft) {
+    graftRow.style.display = 'flex';
+    document.getElementById('sug-graft-date').textContent = fmtJP(lastSuggest.graft);
+  } else {
+    graftRow.style.display = 'none';
+  }
+}
+
+document.getElementById('btn-apply-suggest').onclick = () => {
+  if (!lastSuggest) return;
+  document.getElementById('f-sow').value   = lastSuggest.sow;
+  document.getElementById('f-ship').value  = lastSuggest.ship;
+  if (lastSuggest.graft) document.getElementById('f-graft').value = lastSuggest.graft;
+};
+
+['f-crop','f-delivery'].forEach(id =>
+  document.getElementById(id).addEventListener('change', updateSuggest));
+document.getElementById('f-type').addEventListener('change', updateSuggest);
+document.getElementById('f-type').addEventListener('input',  updateSuggest);
+
+// 規格：セレクト ↔ テキスト連動
+(function() {
+  const sel = document.getElementById('f-type-sel');
+  const txt = document.getElementById('f-type');
+  function onSelChange() {
+    if (sel.value === '__custom__') {
+      txt.style.display = '';
+      txt.value = '';
+      txt.focus();
+    } else {
+      txt.style.display = 'none';
+      txt.value = sel.value;
+    }
+    updateVarietyFields();
+    updateSuggest();
+    renderVarietySuggests();
+  }
+  sel.addEventListener('change', onSelChange);
+  txt.addEventListener('input', () => { updateVarietyFields(); updateSuggest(); renderVarietySuggests(); });
+})();
+
+// 品目変更で過去品種サジェスト表示
+function renderVarietySuggests() {
+  const crop = document.getElementById('f-crop').value;
+  const graft = isGraft(document.getElementById('f-type').value);
+
+  function buildChips(containerId, onClickScion, onClickStock) {
+    const wrap = document.getElementById(containerId);
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    if (!crop) return;
+    // 過去注文から品種を収集（接ぎ木は"穂木×台木"、その他は"品種"）
+    const seen = new Set();
+    const items = [];
+    [...orders].forEach(o => {
+      if (o.crop !== crop) return;
+      if (graft) {
+        const s = o.varietyScion || (o.variety?.split('×')[0] ?? '').trim();
+        const t = o.varietyStock || (o.variety?.split('×')[1] ?? '').trim();
+        if (s || t) {
+          const key = s + '×' + t;
+          if (!seen.has(key)) { seen.add(key); items.push({ scion: s, stock: t }); }
+        }
+      } else {
+        const v = o.variety || o.varietyScion || '';
+        if (v && !seen.has(v)) { seen.add(v); items.push({ label: v }); }
+      }
+    });
+    items.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.style.cssText = 'padding:4px 10px;border:1px solid var(--green);border-radius:14px;background:var(--green-l);font-size:12px;cursor:pointer;white-space:nowrap';
+      btn.textContent = graft ? (item.scion + (item.stock ? '×' + item.stock : '')) : item.label;
+      btn.onclick = () => {
+        if (graft) { onClickScion(item.scion); onClickStock(item.stock); }
+        else { onClickScion(item.label); }
+      };
+      wrap.appendChild(btn);
+    });
+  }
+
+  buildChips('variety-suggest-single',
+    v => document.getElementById('f-variety-single').value = v,
+    () => {}
+  );
+  buildChips('variety-suggest-graft',
+    v => document.getElementById('f-variety-scion').value = v,
+    v => document.getElementById('f-variety-stock').value = v
+  );
+}
+document.getElementById('f-crop').addEventListener('change', renderVarietySuggests);
+
+// 規格変更で品種欄を切り替え
+function updateVarietyFields() {
+  const graft = isGraft(document.getElementById('f-type').value);
+  document.getElementById('variety-row-single').style.display = graft ? 'none' : '';
+  document.getElementById('variety-row-graft').style.display  = graft ? '' : 'none';
+}
+
+document.getElementById('btn-cal-add').onclick      = () => openOrderForm();
+document.getElementById('btn-order-add-h').onclick  = () => openOrderForm();
+document.getElementById('btn-order-add-f').onclick  = () => openOrderForm();
+document.getElementById('btn-order-form-back').onclick = () => showTab(currentTab === 'calendar' ? 'calendar' : 'orders');
+
+document.getElementById('btn-order-delete').onclick = () => {
+  if (!confirm('この注文を削除しますか？')) return;
+  orders = orders.filter(o => o.id !== editingOrderId);
+  saveOrders();
+  renderCalendar();
+  showTab('orders');
+};
+
+document.getElementById('btn-order-submit').onclick = async () => {
+  const crop     = document.getElementById('f-crop').value;
+  const delivery = document.getElementById('f-delivery').value;
+  if (!crop || !delivery) { alert('品目と納品予定日は必須です'); return; }
+
+  const btn = document.getElementById('btn-order-submit');
+  btn.disabled = true; btn.textContent = '保存中…';
+
+  const data = {
+    orderDate: document.getElementById('f-orderDate').value,
+    customer:  document.getElementById('f-customer').value,
+    phone:     document.getElementById('f-phone').value.trim(),
+    crop,
+    varietyScion: isGraft(document.getElementById('f-type').value) ? document.getElementById('f-variety-scion').value.trim() : '',
+    varietyStock: isGraft(document.getElementById('f-type').value) ? document.getElementById('f-variety-stock').value.trim() : '',
+    variety: isGraft(document.getElementById('f-type').value)
+      ? [document.getElementById('f-variety-scion').value.trim(), document.getElementById('f-variety-stock').value.trim()].filter(Boolean).join('×')
+      : document.getElementById('f-variety-single').value.trim(),
+    qty:       document.getElementById('f-qty').value,
+    type:      document.getElementById('f-type').value,
+    price:     document.getElementById('f-price').value,
+    delivery,
+    sowDate:   document.getElementById('f-sow').value,
+    graftDate: document.getElementById('f-graft').value,
+    shipDate:  document.getElementById('f-ship').value,
+    potDate:   document.getElementById('f-pot').value,
+    memo:        document.getElementById('f-memo').value,
+    seedOrdered: document.getElementById('f-seed-ordered').checked,
+    updatedAt:   new Date().toISOString()
+  };
+
+  if (editingOrderId) {
+    orders = orders.map(o => o.id === editingOrderId ? { id: editingOrderId, ...data } : o);
+  } else {
+    data.createdAt = new Date().toISOString();
+    orders.push({ id: genId(), ...data });
+  }
+  saveOrders();
+  renderCalendar();
+  showTab(currentTab === 'calendar' ? 'calendar' : 'orders');
+
+  btn.disabled = false; btn.textContent = '保存する';
+};
+
+// ── 注文一覧 ──────────────────────────────────────────
+function renderOrderList() {
+  const q    = document.getElementById('order-search').value.toLowerCase();
+  const body = document.getElementById('order-list-body');
+  const todayStr = today();
+
+  // 状態分類
+  function orderStatus(o) {
+    if (o.shipDate && o.shipDate <= todayStr) return 'shipped';   // 出荷済み
+    if (o.sowDate  && o.sowDate  <= todayStr) return 'growing';   // 在圃中
+    return 'pending';                                              // 播種前
+  }
+
+  const filtered = [...orders]
+    .filter(o => !q || [o.crop, o.variety, o.customer].some(v => (v||'').toLowerCase().includes(q)));
+
+  const pending  = filtered.filter(o => orderStatus(o) === 'pending') .sort((a,b)=>(a.delivery||'').localeCompare(b.delivery||''));
+  const growing  = filtered.filter(o => orderStatus(o) === 'growing') .sort((a,b)=>(a.delivery||'').localeCompare(b.delivery||''));
+  const shipped  = filtered.filter(o => orderStatus(o) === 'shipped') .sort((a,b)=>(b.shipDate||'').localeCompare(a.shipDate||''));
+
+  if (!filtered.length) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">注文がありません</div></div>';
+    return;
+  }
+  body.innerHTML = '';
+
+  // スタイル定義
+  const styles = {
+    pending: { bg:'#fffde7', border:'#f9a825', iconBg:'#fff3b0', icon:'🌾', label:'播種前', labelColor:'#e65100' },
+    growing: { bg:'#e8f5e9', border:'#388e3c', iconBg:'#c8e6c9', icon:'🌱', label:'在圃中', labelColor:'#2e7d32' },
+    shipped: { bg:'#f9f9f9', border:'#e0e0e0', iconBg:'#eeeeee', icon:'📦', label:'出荷済み', labelColor:'#757575' },
+  };
+
+  function addSectionHeader(text, color) {
+    const h = document.createElement('div');
+    h.style.cssText = `padding:6px 16px 3px;font-size:11px;font-weight:bold;color:${color};background:#fff;border-bottom:1px solid #eee;letter-spacing:1px`;
+    h.textContent = text;
+    body.appendChild(h);
+  }
+
+  function addItems(list, status) {
+    const s = styles[status];
+    list.forEach(o => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      div.style.cssText = `background:${s.bg};border-left:4px solid ${s.border};`;
+      const seedBadge = o.seedOrdered
+        ? `<span class="seed-badge seed-done">🌱 種子発注済</span>`
+        : `<span class="seed-badge seed-todo">🌱 種子未発注</span>`;
+      div.innerHTML = `
+        <div class="list-icon" style="background:${s.iconBg}">${isGraft(o.type) ? '✂️' : s.icon}</div>
+        <div class="list-body">
+          <div class="list-title">${o.crop}${o.variety ? ' / ' + o.variety : ''}</div>
+          <div class="list-sub">納品：${fmtJP(o.delivery)}${o.qty ? '　' + o.qty : ''}${o.customer ? '　' + o.customer : ''}</div>
+          <div class="list-sub">播種：${fmtJP(o.sowDate) || '未設定'}${status==='shipped' ? '　出荷：'+fmtJP(o.shipDate) : ''}</div>
+          <div style="margin-top:5px">${seedBadge}</div>
+        </div>
+        <div class="list-arrow">›</div>`;
+      // 種子バッジをタップ → 発注済み/未発注をその場で切り替え
+      div.querySelector('.seed-badge').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = orders.findIndex(x => x.id === o.id);
+        if (idx < 0) return;
+        orders[idx].seedOrdered = !orders[idx].seedOrdered;
+        saveOrders();
+        renderOrderList();
+      });
+      div.onclick = () => openOrderForm(o);
+      body.appendChild(div);
+    });
+  }
+
+  if (pending.length) { addSectionHeader('🌾 播種前', styles.pending.labelColor); addItems(pending, 'pending'); }
+  if (growing.length) { addSectionHeader('🌱 在圃中', styles.growing.labelColor); addItems(growing, 'growing'); }
+  if (shipped.length) { addSectionHeader('📦 出荷済み', styles.shipped.labelColor); addItems(shipped, 'shipped'); }
+}
+document.getElementById('order-search').addEventListener('input', renderOrderList);
+
+// ── 農薬自動紐づけ ────────────────────────────────────
+function getInProgressOrders(dateStr) {
+  // 播種済み・未出荷の注文を返す（登録作物・未登録作物で分類）
+  const registered = [], unregistered = [];
+  for (const o of orders) {
+    if (!o.sowDate || o.sowDate > dateStr) continue;          // 未播種
+    if (o.shipDate && o.shipDate < dateStr) continue;         // 出荷済み
+    if (!o.shipDate && o.delivery && o.delivery < dateStr) continue; // 納期超過
+    if (REGISTERED_CROPS.has(o.crop)) registered.push(o);
+    else unregistered.push(o);
+  }
+  return { registered, unregistered };
+}
+
+function getPestLogCropNames(log) {
+  if (log.linkedOrderIds && log.linkedOrderIds.length) {
+    const crops = [...new Set(
+      log.linkedOrderIds.map(id => orders.find(o => o.id === id)?.crop).filter(Boolean)
+    )];
+    return crops.join('・') || '（注文削除済み）';
+  }
+  return log.crop || ''; // 旧形式の互換
+}
+
+function renderPestCropLinks(checkedIds = null) {
+  const dateStr = document.getElementById('pf-date').value;
+  const el = document.getElementById('pest-crop-links');
+  if (!dateStr) {
+    el.innerHTML = '<div style="color:var(--text2);font-size:12px">日付を入力すると栽培中の苗を自動検出します</div>';
+    return;
+  }
+  const { registered, unregistered } = getInProgressOrders(dateStr);
+  if (!registered.length && !unregistered.length) {
+    el.innerHTML = '<div style="color:var(--text2);font-size:12px;padding:4px 0">この日付で播種済み・未出荷の苗はありません</div>';
+    return;
+  }
+  let html = '';
+  for (const o of registered) {
+    const isChecked = checkedIds ? checkedIds.includes(o.id) : true; // 新規は全チェック
+    const sub = [o.variety, o.type].filter(Boolean).join(' ');
+    const ship = fmtJP(o.shipDate || o.delivery);
+    html += `<label style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" class="pest-crop-cb" data-id="${o.id}"
+        style="width:18px;height:18px;margin-top:2px;flex-shrink:0" ${isChecked ? 'checked' : ''}>
+      <span style="font-size:13px;line-height:1.5">
+        <strong>${o.crop}</strong>${sub ? '　' + sub : ''}${o.customer ? '　（' + o.customer + '）' : ''}<br>
+        <span style="font-size:11px;color:var(--text2)">播種 ${fmtJP(o.sowDate)}　出荷予定 ${ship}</span>
+      </span>
+    </label>`;
+  }
+  if (unregistered.length) {
+    const names = unregistered.map(o =>
+      `${o.crop}${o.customer ? '（' + o.customer + '）' : ''}`).join('、');
+    html += `<div style="margin-top:8px;padding:7px 10px;background:#fff3cd;border-radius:8px;font-size:11px;color:#856404">
+      ⚠️ <strong>政府未登録作物のため対象外：</strong> ${names}
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+
+document.getElementById('btn-open-master').onclick = () => {
+  renderMasterList();
+  showScreen('screen-master');
+};
+document.getElementById('btn-master-back').onclick = () => showTab('settings');
+document.getElementById('btn-master-add').onclick  = () => {
+  ['m-name','m-ingredient','m-memo','m-crop-filter'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('m-type').value = '';
+  editingPestMasterId = null;
+  renderCropCheckboxes({});
+  document.getElementById('master-overlay').classList.add('open');
+};
+document.getElementById('master-modal-close').onclick =
+  () => document.getElementById('master-overlay').classList.remove('open');
+
+document.getElementById('btn-master-save').onclick = () => {
+  const name = document.getElementById('m-name').value.trim();
+  if (!name) { alert('農薬名を入力してください'); return; }
+  // チェック済み野菜と倍率を収集
+  const cropData = {};
+  document.querySelectorAll('#m-crop-checks input[type=checkbox][data-crop]').forEach(cb => {
+    if (cb.checked) {
+      const crop = cb.dataset.crop;
+      const dilInput = cb.closest('div').querySelector('input[data-dil]');
+      cropData[crop] = { checked: true, dilution: dilInput ? dilInput.value.trim() : '' };
+    }
+  });
+  const targetCrops = Object.keys(cropData);
+  const data = {
+    name,
+    ingredient:  document.getElementById('m-ingredient').value.trim(),
+    type:        document.getElementById('m-type').value,
+    memo:        document.getElementById('m-memo').value.trim(),
+    targetCrops,
+    cropData,
+    updatedAt:   new Date().toISOString()
+  };
+  const existing = editingPestMasterId
+    ? pestMaster.find(p => p.id === editingPestMasterId)
+    : pestMaster.find(p => p.name === name);
+  if (existing) {
+    Object.assign(existing, data);
+  } else {
+    data.createdAt = new Date().toISOString();
+    pestMaster.push({ id: genId(), ...data });
+  }
+  editingPestMasterId = null;
+  savePestMaster();
+  renderMasterList();
+  document.getElementById('master-overlay').classList.remove('open');
+};
+
+// チェックボックス＋倍率入力欄を描画
+// cropData = { cropName: { checked: true, dilution: '2000倍' }, ... }
+let editingPestMasterId = null;
+function renderCropCheckboxes(cropData) {
+  const wrap = document.getElementById('m-crop-checks');
+  const filter = (document.getElementById('m-crop-filter')?.value || '').trim();
+  let list = PEST_TARGET_CROPS.filter(c => !filter || c.includes(filter));
+  if (!list.length) {
+    wrap.innerHTML = '<div style="padding:8px;font-size:12px;color:var(--text2);text-align:center">該当する野菜がありません</div>';
+    return;
+  }
+  // チェック済みを先頭に
+  list = [...list].sort((a,b) => ((cropData[b]?.checked)?1:0) - ((cropData[a]?.checked)?1:0));
+  wrap.innerHTML = list.map(c => {
+    const entry = cropData[c] || {};
+    const ck = entry.checked ? 'checked' : '';
+    const dil = (entry.dilution || '').replace(/"/g, '&quot;');
+    const bg = entry.checked ? 'background:#e8f5e9;' : '';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 6px;${bg}border-radius:4px">
+      <input type="checkbox" data-crop="${c}" ${ck} style="width:16px;height:16px;accent-color:var(--green);flex-shrink:0">
+      <span style="flex:1;font-size:13px">${c}</span>
+      <input type="text" data-dil="${c}" value="${dil}" placeholder="希釈倍率" style="width:100px;padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:12px;${entry.checked?'':'opacity:0.4'}">
+    </div>`;
+  }).join('');
+  // チェックON/OFFで倍率欄の見た目を切り替え
+  wrap.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const row = cb.closest('div');
+      const dilInput = row.querySelector('input[type=text]');
+      if (cb.checked) {
+        row.style.background = '#e8f5e9';
+        dilInput.style.opacity = '1';
+      } else {
+        row.style.background = '';
+        dilInput.style.opacity = '0.4';
+        dilInput.value = '';
+      }
+    });
+  });
+}
+
+// フィルタ入力時に再描画（チェック状態・倍率を保持）
+document.getElementById('m-crop-filter').addEventListener('input', () => {
+  const current = {};
+  document.querySelectorAll('#m-crop-checks input[type=checkbox][data-crop]').forEach(cb => {
+    if (cb.checked) {
+      const dilInput = cb.closest('div').querySelector('input[data-dil]');
+      current[cb.dataset.crop] = { checked: true, dilution: dilInput ? dilInput.value.trim() : '' };
+    }
+  });
+  renderCropCheckboxes(current);
+});
+
+// 全選択・全解除
+document.getElementById('btn-crop-check-all').onclick = () => {
+  document.querySelectorAll('#m-crop-checks input[type=checkbox]').forEach(cb => {
+    cb.checked = true;
+    const row = cb.closest('div');
+    row.style.background = '#e8f5e9';
+    const dil = row.querySelector('input[type=text]');
+    if (dil) dil.style.opacity = '1';
+  });
+};
+document.getElementById('btn-crop-uncheck-all').onclick = () => {
+  document.querySelectorAll('#m-crop-checks input[type=checkbox]').forEach(cb => {
+    cb.checked = false;
+    const row = cb.closest('div');
+    row.style.background = '';
+    const dil = row.querySelector('input[type=text]');
+    if (dil) { dil.style.opacity = '0.4'; dil.value = ''; }
+  });
+};
+
+
+function renderMasterList() {
+  const body = document.getElementById('master-list-body');
+  const list = [...pestMaster].sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ja'));
+  if (!list.length) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">農薬が登録されていません<br><span style="font-size:12px">右上の＋で追加できます</span></div></div>';
+    return;
+  }
+  body.innerHTML = `<div style="padding:6px 16px;font-size:11px;color:var(--text2)">${list.length}件</div>`;
+  list.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    // 種別カラー
+    const typeStyleMap = {
+      '殺虫剤':       { bg:'#ffe8e8', border:'#e53935', icon:'#ffcccc', emoji:'🐛', label:'#c62828' },
+      '殺菌剤':       { bg:'#e8f0ff', border:'#1976d2', icon:'#c5d8ff', emoji:'🦠', label:'#1565c0' },
+      '殺虫殺菌剤':   { bg:'#f3e8ff', border:'#7b1fa2', icon:'#e0c8ff', emoji:'💊', label:'#6a1b9a' },
+      '除草剤':       { bg:'#fffbe8', border:'#f9a825', icon:'#fff0b0', emoji:'🌿', label:'#e65100' },
+      '植物成長調整剤':{ bg:'#e8fff4', border:'#388e3c', icon:'#c2f0d8', emoji:'🌱', label:'#2e7d32' },
+    };
+    const ts = typeStyleMap[p.type] || { bg:'#f5f5f5', border:'#bdbdbd', icon:'#e0e0e0', emoji:'💊', label:'#757575' };
+    div.style.cssText = `border-left:4px solid ${ts.border};background:${ts.bg};`;
+    const cropCount = (p.targetCrops||[]).length;
+    const typeLabel = p.type ? `<span style="font-size:10px;font-weight:bold;color:${ts.label};background:${ts.icon};border-radius:4px;padding:1px 5px;margin-right:4px">${p.type}</span>` : '';
+    const sub1 = [cropCount ? `適合野菜 ${cropCount}種` : ''].filter(Boolean).join('　');
+    const sub2 = p.ingredient ? `成分：${p.ingredient}` : "";
+    div.innerHTML = `
+      <div class="list-icon" style="background:${ts.icon}">${ts.emoji}</div>
+      <div class="list-body">
+        <div class="list-title">${typeLabel}${p.name}</div>
+        ${sub1 ? `<div class="list-sub">${sub1}</div>` : ""}
+        ${sub2 ? `<div class="list-sub" style="font-size:11px;color:var(--text2)">${sub2}</div>` : ""}
+      </div>
+      <button class="btn-danger" style="font-size:12px;padding:6px 10px;flex-shrink:0">削除</button>`;
+    div.querySelector('.list-body').onclick = () => editPestMaster(p);
+    div.querySelector('.btn-danger').onclick = e => {
+      e.stopPropagation();
+      if (!confirm(`「${p.name}」を削除しますか？`)) return;
+      pestMaster = pestMaster.filter(x => x.id !== p.id);
+      savePestMaster();
+      renderMasterList();
+    };
+    body.appendChild(div);
+  });
+}
+
+function editPestMaster(p) {
+  editingPestMasterId = p.id;
+  document.getElementById('m-name').value       = p.name || '';
+  document.getElementById('m-type').value       = p.type || '';
+  document.getElementById('m-ingredient').value = p.ingredient || '';
+  document.getElementById('m-memo').value       = p.memo || '';
+  document.getElementById('m-crop-filter').value = '';
+  // cropData がなければ targetCrops 配列から復元（後方互換）
+  const cropData = p.cropData || {};
+  (p.targetCrops || []).forEach(c => { if (!cropData[c]) cropData[c] = { checked: true, dilution: '' }; });
+  renderCropCheckboxes(cropData);
+  document.getElementById('master-overlay').classList.add('open');
+}
+
+// ── 品種マスター画面 ──────────────────────────────
+document.getElementById('btn-open-variety-master').onclick = () => {
+  renderVarietyMasterList();
+  showScreen('screen-variety-master');
+};
+document.getElementById('btn-variety-master-back').onclick = () => showTab('settings');
+document.getElementById('btn-variety-master-add').onclick  = () => {
+  ['vm-sales','vm-regname','vm-regnum','vm-seed-ingredient','vm-seed-timing'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('vm-seed-chk').checked = false;
+  document.getElementById('vm-seed-fields').style.display = 'none';
+  document.getElementById('variety-master-overlay').classList.add('open');
+};
+document.getElementById('variety-master-modal-close').onclick =
+  () => document.getElementById('variety-master-overlay').classList.remove('open');
+
+// 種子消毒チェックON/OFFで入力欄を表示切替
+document.getElementById('vm-seed-chk').addEventListener('change', function() {
+  document.getElementById('vm-seed-fields').style.display = this.checked ? '' : 'none';
+});
+
+document.getElementById('btn-variety-master-save').onclick = () => {
+  const salesName = document.getElementById('vm-sales').value.trim();
+  if (!salesName) { alert('販売名を入力してください'); return; }
+  const seedChk = document.getElementById('vm-seed-chk').checked;
+  const data = {
+    salesName,
+    regName:        document.getElementById('vm-regname').value.trim(),
+    regNumber:      document.getElementById('vm-regnum').value.trim(),
+    seedTreatment:  seedChk,
+    seedIngredient: seedChk ? document.getElementById('vm-seed-ingredient').value.trim() : '',
+    seedTiming:     seedChk ? (document.getElementById('vm-seed-timing').value.trim() || '播種前（種子）') : '',
+    updatedAt: new Date().toISOString()
+  };
+  const existing = varietyMaster.find(v => v.salesName === salesName);
+  if (existing) {
+    Object.assign(existing, data);
+  } else {
+    varietyMaster.push({ id: genId(), createdAt: new Date().toISOString(), ...data });
+  }
+  saveVarietyMaster();
+  renderVarietyMasterList();
+  document.getElementById('variety-master-overlay').classList.remove('open');
+};
+
+function renderVarietyMasterList() {
+  const body = document.getElementById('variety-master-list-body');
+  const list = [...varietyMaster].sort((a,b) => (a.salesName||'').localeCompare(b.salesName||'', 'ja'));
+  if (!list.length) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-text">品種が登録されていません<br><span style="font-size:12px">右上の＋で追加できます</span></div></div>';
+    return;
+  }
+  body.innerHTML = `<div style="padding:6px 16px;font-size:11px;color:var(--text2)">${list.length}件</div>`;
+  list.forEach(v => {
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    const sub1 = [v.regName, v.regNumber].filter(Boolean).join('　');
+    const seedBadge = v.seedTreatment
+      ? `<span style="font-size:10px;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:10px;padding:1px 7px;margin-left:6px">種子消毒</span>`
+      : '';
+    div.innerHTML = `
+      <div class="list-icon" style="background:var(--green-l)">🌱</div>
+      <div class="list-body">
+        <div class="list-title">${v.salesName}${seedBadge}</div>
+        ${sub1 ? `<div class="list-sub">${sub1}</div>` : ""}
+        ${v.seedTreatment && v.seedIngredient ? `<div class="list-sub" style="color:#856404">🧪 ${v.seedIngredient}</div>` : ''}
+      </div>
+      <button class="btn-danger" style="font-size:12px;padding:6px 10px;flex-shrink:0">削除</button>`;
+    div.querySelector('.list-body').onclick = () => editVarietyMaster(v);
+    div.querySelector('.btn-danger').onclick = e => {
+      e.stopPropagation();
+      if (!confirm(`「${v.salesName}」を削除しますか？`)) return;
+      varietyMaster = varietyMaster.filter(x => x.id !== v.id);
+      saveVarietyMaster();
+      renderVarietyMasterList();
+    };
+    body.appendChild(div);
+  });
+}
+
+function editVarietyMaster(v) {
+  document.getElementById('vm-sales').value = v.salesName || '';
+  document.getElementById('vm-regname').value = v.regName || '';
+  document.getElementById('vm-regnum').value = v.regNumber || '';
+  const seedChk = document.getElementById('vm-seed-chk');
+  seedChk.checked = !!v.seedTreatment;
+  document.getElementById('vm-seed-fields').style.display = v.seedTreatment ? '' : 'none';
+  document.getElementById('vm-seed-ingredient').value = v.seedIngredient || '';
+  document.getElementById('vm-seed-timing').value = v.seedTiming || '';
+  document.getElementById('variety-master-overlay').classList.add('open');
+}
+
+// 注文の品種名から登録情報を引き出すヘルパー
+function lookupVarietyReg(name) {
+  if (!name) return null;
+  const n = name.trim();
+  return varietyMaster.find(v => v.salesName === n || v.regName === n) || null;
+}
+
+// ── 農薬散布記録フォーム ──────────────────────────────
+function renderPestHistoryChips() {
+  const wrap = document.getElementById('pest-history-chips');
+  if (!pestMaster.length) { wrap.innerHTML = '<span style="font-size:12px;color:var(--text2)">まだ記録がありません</span>'; return; }
+  const sorted = [...pestMaster].sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+  wrap.innerHTML = '';
+  sorted.forEach(p => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.textContent = p.name;
+    chip.style.cssText = "padding:5px 10px;border:1px solid var(--green);border-radius:15px;background:var(--green-l);font-size:12px;cursor:pointer;white-space:nowrap";
+    chip.onclick = () => selectPestFromHistory(p);
+    wrap.appendChild(chip);
+  });
+}
+
+function selectPestFromHistory(p) {
+  document.getElementById('pf-name').value = p.name;
+  document.getElementById('pf-ingredient-val').value = p.ingredient || '';
+  document.getElementById('pest-sel-name').textContent = p.name;
+  document.getElementById("pest-sel-sub").textContent = [p.ingredient ? "成分：" + p.ingredient : "", p.dilution ? "希釈：" + p.dilution : ""].filter(Boolean).join("　");
+  document.getElementById('pest-selected-area').style.display = '';
+  document.getElementById('pest-history-section').style.display = 'none';
+}
+
+function clearPestSelection() {
+  document.getElementById('pf-name').value = '';
+  document.getElementById('pf-ingredient-val').value = '';
+  document.getElementById('pest-selected-area').style.display = 'none';
+  document.getElementById('pest-history-section').style.display = '';
+}
+
+function openPestForm(log = null) {
+  editingPestId = log?.id ?? null;
+  document.getElementById('pest-form-title').textContent = log ? '農薬記録を編集' : '農薬散布を記録';
+  document.getElementById('btn-pest-delete').style.display = log ? '' : 'none';
+  document.getElementById('pf-date').value = log?.date ?? today();
+  renderPestHistoryChips();
+  if (log?.pestName) {
+    const master = pestMaster.find(p => p.name === log.pestName);
+    if (master) {
+      selectPestFromHistory(master);
+    } else {
+      // マスターに存在しない過去記録：農薬名のみ表示
+      clearPestSelection();
+      document.getElementById('pest-sel-name').textContent = log.pestName + '（マスター未登録）';
+      document.getElementById('pest-sel-sub').textContent = log.pestIngredient ? '成分：' + log.pestIngredient : '';
+      document.getElementById('pest-selected-area').style.display = '';
+      document.getElementById('pest-history-section').style.display = 'none';
+      document.getElementById('pf-name').value = log.pestName;
+      document.getElementById('pf-ingredient-val').value = log.pestIngredient || '';
+    }
+  } else {
+    clearPestSelection();
+  }
+  document.getElementById('pf-memo').value      = log?.memo ?? '';
+  // 自動検出（編集時は既存の linkedOrderIds を復元）
+  renderPestCropLinks(log?.linkedOrderIds ?? null);
+  showScreen('screen-pesticide-form');
+}
+
+// 日付変更で自動再検出
+document.getElementById('pf-date').addEventListener('change', () => renderPestCropLinks(null));
+
+document.getElementById('btn-pest-form-back').onclick = () => showTab('pesticide');
+document.getElementById('btn-pest-add-h').onclick     = () => openPestForm();
+document.getElementById('btn-pest-add-f').onclick     = () => openPestForm();
+document.getElementById('btn-pest-clear').onclick = () => clearPestSelection();
+
+document.getElementById('btn-pest-delete').onclick = () => {
+  if (!confirm('この記録を削除しますか？')) return;
+  pestLogs = pestLogs.filter(p => p.id !== editingPestId);
+  savePestLogs();
+  renderCalendar();
+  renderPestList();
+  showTab('pesticide');
+};
+
+document.getElementById('btn-pest-submit').onclick = () => {
+  const date = document.getElementById('pf-date').value;
+  // 農薬名：マスターから選択済みのもののみ
+  const pestName = document.getElementById('pf-name').value.trim();
+  if (!date || !pestName) { alert('散布日と農薬名は必須です'); return; }
+
+  // 成分名・希釈
+  const pestIngredient = document.getElementById('pf-ingredient-val').value.trim();
+  const dilution = '';
+
+  // チェックされた注文IDを収集
+  const linkedOrderIds = [...document.querySelectorAll('.pest-crop-cb:checked')]
+    .map(cb => cb.dataset.id);
+
+  const btn = document.getElementById('btn-pest-submit');
+  btn.disabled = true; btn.textContent = '保存中…';
+
+  // linkedOrderIds が空の場合、その日付で在圃中の登録作物注文を自動リンク
+  let finalLinkedIds = linkedOrderIds;
+  if (!finalLinkedIds.length) {
+    const { registered } = getInProgressOrders(date);
+    finalLinkedIds = registered.map(o => o.id);
+  }
+
+  const data = {
+    date, pestName, pestIngredient,
+    linkedOrderIds: finalLinkedIds,
+    dilution,
+    memo:     document.getElementById('pf-memo').value,
+    updatedAt: new Date().toISOString()
+  };
+  if (editingPestId) {
+    pestLogs = pestLogs.map(p => p.id === editingPestId ? { id: editingPestId, ...data } : p);
+  } else {
+    data.createdAt = new Date().toISOString();
+    pestLogs.unshift({ id: genId(), ...data });
+  }
+  savePestLogs();
+  renderCalendar();
+  renderPestList();
+  showTab('pesticide');
+  btn.disabled = false; btn.textContent = '保存する';
+};
+
+// ── 農薬散布一覧 ──────────────────────────────────────
+function renderPestList() {
+  const body = document.getElementById('pesticide-list-body');
+  if (!pestLogs.length) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">🌿</div><div class="empty-text">農薬散布記録がありません</div></div>';
+    return;
+  }
+  body.innerHTML = '';
+  [...pestLogs].sort((a, b) => (b.date||'').localeCompare(a.date||'')).forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    const name = p.pestName || '不明';
+    const cropNames = getPestLogCropNames(p);
+    div.innerHTML = `
+      <div class="list-icon" style="background:var(--purple-l)">💊</div>
+      <div class="list-body">
+        <div class="list-title">${name}</div>
+        <div class="list-sub">${fmtJP(p.date)}　${cropNames}${p.dilution ? '　希釈' + p.dilution : ''}</div>
+      </div>
+      <div class="list-arrow">›</div>`;
+    div.onclick = () => openPestForm(p);
+    body.appendChild(div);
+  });
+}
+
+// ── 履歴データインポート ──────────────────────────────
+document.getElementById('import-drop').onclick = () =>
+  document.getElementById('import-file').click();
+
+document.getElementById('import-file').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const data = await file.arrayBuffer();
+  let rows;
+  try {
+    const wb = XLSX.read(data, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  } catch(err) {
+    alert('ファイルの読み込みに失敗しました: ' + err.message);
+    return;
+  }
+
+  if (!rows.length) { alert('データがありません'); return; }
+
+  const headers = Object.keys(rows[0]);
+  const ALIASES = {
+    crop:     ['品目','作物','Crop'],
+    type:     ['種類','規格','Type','苗の種類','苗規格'],
+    sowDate:  ['播種日','播種','Sow','SowDate'],
+    shipDate: ['出荷日','出荷','Ship','ShipDate','納期','納品日']
+  };
+  const colMap = {};
+  for (const [field, aliases] of Object.entries(ALIASES)) {
+    for (const alias of aliases) {
+      const h = headers.find(h => h.trim() === alias);
+      if (h) { colMap[field] = h; break; }
+    }
+  }
+
+  const missing = ['crop','sowDate','shipDate'].filter(f => !colMap[f]);
+  if (missing.length) {
+    const jp = { crop:'品目', sowDate:'播種日', shipDate:'出荷日' };
+    alert(`必須列が見つかりません：${missing.map(f=>jp[f]).join('、')}\n\n検出された列：${headers.join('、')}`);
+    return;
+  }
+
+  const toDate = v => {
+    if (v instanceof Date) return dateToLocal(v);
+    const s = v.toString().replace(/\//g, '-').trim();
+    return s.match(/^\d{4}-\d{2}-\d{2}/) ? s.slice(0, 10) : null;
+  };
+
+  const parsed = [];
+  for (const row of rows) {
+    const crop = (row[colMap.crop] || '').toString().trim();
+    const type = (row[colMap.type] || '').toString().trim();
+    const sow  = toDate(row[colMap.sowDate]);
+    const ship = toDate(row[colMap.shipDate]);
+    if (!crop || !sow || !ship) continue;
+    const days = Math.round((parseLocalDate(ship) - parseLocalDate(sow)) / 86400000);
+    if (days < 5 || days > 400) continue;
+    parsed.push({ crop, type, days, ship });
+  }
+
+  if (!parsed.length) {
+    alert('有効なデータが見つかりませんでした。\n列名と日付形式（YYYY-MM-DD）を確認してください。');
+    return;
+  }
+
+  const stats = {};
+  for (const r of parsed) {
+    const season = getSeason(r.ship);
+    const k = statsKey(r.crop, r.type, season);
+    if (!stats[k]) stats[k] = { crop: r.crop, type: normalizeType(r.type), season, days: [] };
+    stats[k].days.push(r.days);
+  }
+  importParsed = stats;
+
+  document.getElementById('import-preview-title').textContent =
+    `プレビュー（有効データ ${parsed.length}件 / ${Object.keys(stats).length}品目）`;
+
+  const lines = Object.values(stats).slice(0, 20).map(v => {
+    const avg = Math.round(v.days.reduce((a,b)=>a+b,0) / v.days.length);
+    const min = Math.min(...v.days), max = Math.max(...v.days);
+    const seasonLabel = v.season ? `【${v.season}】` : '';
+    return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span><strong>${v.crop}</strong>${seasonLabel} / ${v.type}</span>
+      <span style="color:var(--text2)">${v.days.length}件　平均<strong style="color:var(--green)">${avg}日</strong>（${min}〜${max}）</span>
+    </div>`;
+  }).join('');
+  const more = Object.keys(stats).length > 20 ? `<div style="font-size:12px;color:var(--text2);padding:5px 0">他 ${Object.keys(stats).length-20} 品目…</div>` : "";
+  document.getElementById("import-stats").innerHTML = lines + more;
+  document.getElementById("import-preview").style.display = "block";
+  e.target.value = "";
+});
+
+document.getElementById("btn-import-confirm").onclick = async () => {
+  if (!importParsed) return;
+  const btn = document.getElementById("btn-import-confirm");
+  btn.disabled = true; btn.textContent = "保存中…";
+  for (const [, v] of Object.entries(importParsed)) {
+    const k   = statsKey(v.crop, v.type, v.season);
+    const avg = v.days.reduce((a,b) => a+b, 0) / v.days.length;
+    const min = Math.min(...v.days), max = Math.max(...v.days);
+    leadStats[k] = { avg, min, max, count: v.days.length, season: v.season };
+  }
+  saveLeadStats();
+  alert(`✅ ${Object.keys(importParsed).length}品目の統計データを保存しました！\n播種日の提案が履歴ベースになります。`);
+  renderImportCurrentStats();
+  document.getElementById("import-preview").style.display = "none";
+  importParsed = null;
+  btn.disabled = false; btn.textContent = "この内容で取り込む";
+};
+
+function renderImportCurrentStats() {
+  const el   = document.getElementById("import-current-stats");
+  const keys = Object.keys(leadStats);
+  if (!keys.length) {
+    el.textContent = "データなし（取り込むと播種日の提案精度が上がります）";
+    return;
+  }
+  el.innerHTML = `<span style="font-size:18px;font-weight:700;color:var(--green)">${keys.length}</span> 品目の統計データを保存済み<br>
+    <span style="font-size:12px;color:var(--text2)">注文追加時に播種日が履歴ベースで提案されます</span>`;
+}
+
+document.getElementById("btn-open-import").onclick = () => {
+  renderImportCurrentStats();
+  showScreen("screen-import");
+};
+document.getElementById("btn-import-back").onclick = () => showTab("settings");
+
+// ── 農薬使用履歴 印刷 ────────────────────────────────
+function fmtPrint(dateStr) {
+  if (!dateStr) return "　　　　";
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+}
+
+function printPestHistory() {
+  const order = orders.find(o => o.id === editingOrderId);
+  if (!order) return;
+  const from = order.sowDate || "";
+  const to   = order.shipDate || order.delivery || "";
+  const oCrop   = (order.crop || '').trim();
+  const toDate  = to || today();
+
+  const usedPests = pestLogs
+    .filter(p => {
+      // ① 明示的にこの注文にリンクされている → 無条件で含める
+      if ((p.linkedOrderIds || []).includes(order.id)) return true;
+
+      // ② 期間チェック（播種日〜出荷日）
+      if (from && p.date < from) return false;
+      if (p.date > toDate)       return false;
+
+      // ③ 品目チェック
+      if (p.linkedOrderIds && p.linkedOrderIds.length) {
+        // 紐づき注文あり: その注文の品目が一致するか
+        const linkedCrops = p.linkedOrderIds
+          .map(id => orders.find(o => o.id === id)?.crop || '')
+          .map(c => c.trim());
+        return linkedCrops.includes(oCrop);
+      }
+      // 紐づきなし・cropフィールドなし → 日付OKなら含める（マスター適合チェックで品目を担保）
+      if (!p.crop) return true;
+      // 旧形式ログ(cropフィールドあり): 品目で判定
+      return p.crop.trim() === oCrop;
+    })
+    .filter(p => {
+      // 農薬マスターの適合野菜チェック：
+      //   マスター未登録           → 含める（判定不可）
+      //   適合野菜が未設定（空）   → 含める（全品目対象とみなす）
+      //   適合野菜に品目あり       → 含める
+      //   適合野菜に品目なし       → 除外
+      const master = pestMaster.find(m =>
+        (m.name || '').trim() === (p.pestName || '').trim()
+      );
+      if (!master) return true;
+      const targetCrops = (master.targetCrops && master.targetCrops.length > 0)
+        ? master.targetCrops
+        : Object.keys(master.cropData || {}).filter(c => master.cropData[c]?.checked);
+      if (!targetCrops.length) return false;  // 適合野菜未設定 → 全品目使用不可
+      return targetCrops.map(c => c.trim()).includes(oCrop);
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+  // 品種登録情報をマスターから検索
+  const scionName = order.varietyScion || (order.variety?.split('×')[0] ?? '').trim();
+  const stockName = order.varietyStock || (order.variety?.split('×')[1] ?? '').trim();
+  const scionReg = lookupVarietyReg(scionName);
+  const stockReg = lookupVarietyReg(stockName);
+  const fillBox = (txt) => (txt && txt.trim()) ? txt : '　　　　　';
+  const scionSalesText = scionReg ? scionReg.salesName : scionName;
+  const scionRegNameText = scionReg ? scionReg.regName : '';
+  const scionRegNumText  = scionReg ? scionReg.regNumber : '';
+  const stockSalesText = stockReg ? stockReg.salesName : stockName;
+  const stockRegNameText = stockReg ? stockReg.regName : '';
+  const stockRegNumText  = stockReg ? stockReg.regNumber : '';
+
+  // 種子消毒行を生成（品種マスターから取得）
+  // 農薬名列=成分名、有効成分列=空、散布日列=処理時期、希釈倍率列=穂木/台木・種子消毒
+  function seedRow(varReg, varName) {
+    if (!varReg?.seedTreatment) return '';
+    const timing    = varReg.seedTiming || '播種前（種子）';
+    const ingr      = varReg.seedIngredient || '—';
+    const kindLabel = varName ? `${varName}・種子消毒` : '種子消毒';
+    return `<tr style="background:#fffde7"><td>${ingr}</td><td></td><td>${timing}</td><td>${kindLabel}</td></tr>`;
+  }
+  const seedLines = [
+    seedRow(scionReg, isGraft(order.type) ? '穂木' : ''),
+    seedRow(stockReg, isGraft(order.type) ? '台木' : ''),
+  ].filter(Boolean).join('');
+
+  const pestLines = usedPests.map(p => {
+    const name       = p.pestName || "";
+    const ingredient = p.pestIngredient || "";
+    // 希釈倍率：マスターの品目別倍率を優先、なければ記録の値
+    const master = pestMaster.find(m => m.name === p.pestName);
+    const masterDilution = master?.cropData?.[order.crop]?.dilution || '';
+    const dilution = masterDilution || p.dilution || "";
+    return `<tr><td>${name}</td><td>${ingredient}</td><td>${fmtPrint(p.date)}</td><td>${dilution}</td></tr>`;
+  }).join("");
+  const totalRows  = usedPests.length + [scionReg, stockReg].filter(r => r?.seedTreatment).length;
+  const emptyRows = Math.max(0, 11 - totalRows);
+  const blankRows = Array(emptyRows).fill('<tr><td></td><td></td><td></td><td></td></tr>').join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>農薬使用履歴</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    font-family: "ＭＳ Ｐゴシック","MS PGothic",sans-serif;
+    font-size: 9.5pt;
+    color: #000;
+    margin: 0; padding: 0;
+    width: 186mm;   /* A4 210mm - 12mm*2 */
+    height: 277mm;  /* A4 297mm - 10mm*2 */
+    overflow: hidden;
+  }
+  h1 {
+    text-align: center; font-size: 15pt; letter-spacing: 6px;
+    margin: 0 0 5px; padding: 0;
+  }
+  /* ── 注文情報ボックス ── */
+  .header-box {
+    border: 2px solid #000; padding: 4px 10px;
+    margin-bottom: 5px; line-height: 1.65;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px;
+  }
+  .header-box .full { grid-column: 1/-1; }
+  .header-box .label { color: #444; font-size: 8pt; }
+  .big { font-size: 12pt; font-weight: bold; }
+  /* ── 品種登録ボックス ── */
+  .reg-box {
+    border: 1px solid #000; padding: 3px 10px;
+    margin-bottom: 5px; font-size: 8.5pt; line-height: 1.65;
+  }
+  .reg-box .reg-title { font-weight: bold; font-size: 8pt; }
+  /* ── 日付行 ── */
+  .dates {
+    font-size: 9.5pt; margin-bottom: 5px; line-height: 1.5;
+    display: flex; gap: 20px;
+  }
+  .dates span { white-space: nowrap; }
+  .dates .dl { font-size: 8pt; color: #444; }
+  /* ── 農薬テーブル ── */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 4px; table-layout: fixed; }
+  th {
+    background: #ddd; border: 1px solid #888;
+    padding: 3px 6px; font-size: 8.5pt; text-align: center;
+  }
+  td {
+    border: 1px solid #aaa; padding: 2px 6px;
+    font-size: 9pt; vertical-align: middle; height: 16px;
+  }
+  col.c1 { width: 33%; }
+  col.c2 { width: 33%; }
+  col.c3 { width: 17%; }
+  col.c4 { width: 17%; }
+  td:nth-child(3) { white-space: nowrap; }
+  .completed { font-weight: bold; font-size: 9pt; margin-bottom: 4px; }
+  /* ── 免責文 ── */
+  .footer-note {
+    border: 1px solid #aaa; padding: 4px 10px;
+    font-size: 7.5pt; line-height: 1.6; margin-bottom: 5px;
+  }
+  /* ── 会社情報 ── */
+  .company-row { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 4px; }
+  .company { text-align: right; font-size: 8.5pt; line-height: 1.75; }
+  .line-qr-wrap { display: flex; align-items: center; gap: 8px; }
+  .line-qr-img { flex-shrink: 0; }
+  .line-qr-img img { width: 60px; height: 60px; display: block; }
+  .line-qr-text { font-size: 7.5pt; color: #000; line-height: 1.65; }
+</style>
+</head>
+<body>
+<h1>農薬使用履歴</h1>
+
+<div class="header-box">
+  <div class="full big">${order.qty || ''}　${order.crop}</div>
+  <div><span class="label">注文主：</span><strong>${order.customer || '　　　　　'}</strong>　様</div>
+  <div><span class="label">出荷日：</span>${fmtPrint(order.shipDate || order.delivery)}</div>
+  <div><span class="label">苗規格：</span>${order.type || '　'}</div>
+  <div><span class="label">数量：</span>${order.qty || '　'}</div>
+  <div><span class="label">生産地：</span>和歌山県</div>
+  ${isGraft(order.type)
+    ? `<div class="full"><span class="label">穂木品種：</span>${order.varietyScion || (order.variety?.split('×')[0] ?? '') || '　'}　　<span class="label">台木品種：</span>${order.varietyStock || (order.variety?.split('×')[1] ?? '') || '　'}</div>`
+    : `<div class="full"><span class="label">品種：</span>${order.variety || '　'}</div>`
+  }
+</div>
+
+<div class="reg-box">
+  <div class="reg-title">品種登録に関して</div>
+  ${isGraft(order.type)
+    ? `<div>穂木販売名《${fillBox(scionSalesText)}》登録品種名《${fillBox(scionRegNameText)}》登録番号《${fillBox(scionRegNumText)}》</div>
+  <div>台木販売名《${fillBox(stockSalesText)}》登録品種名《${fillBox(stockRegNameText)}》登録番号《${fillBox(stockRegNumText)}》</div>`
+    : `<div>販売名《${fillBox(order.variety || '')}》登録品種名《${fillBox(scionRegNameText)}》登録番号《${fillBox(scionRegNumText)}》</div>`
+  }
+</div>
+
+<div class="dates">
+  <span><span class="dl">播種日：</span>${fmtPrint(order.sowDate)}</span>
+  <span><span class="dl">接ぎ木日：</span>${fmtPrint(order.graftDate)}</span>
+  <span><span class="dl">鉢上げ日：</span>${fmtPrint(order.potDate)}</span>
+</div>
+
+<table>
+  <colgroup>
+    <col class="c1"><col class="c2"><col class="c3"><col class="c4">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>農薬名</th><th>成分名</th><th>散布日</th><th>希釈倍率</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${seedLines}
+    ${pestLines}
+    ${blankRows}
+  </tbody>
+</table>
+
+<div class="completed">以上農薬を使用しました</div>
+
+<div class="footer-note">
+  <strong>苗と責任</strong>　この度お納めいたしました苗は、最善の努力により生産しましたが、気象その他条件により、納期品種、本数や苗齢等がご注文と異なっている場合がございます。また鉢上げ後や定植後の栽培条件・天候等により、結果は異なります。万一結果不良などが発生しましても、補償には応じられません。また、結果不良の原因が苗に起因していると判明した場合でも、責任は苗お買い上げ代金の範囲内を限度とさせていただきます。
+</div>
+
+<div class="company-row">
+  <div class="line-qr-wrap">
+    <div class="line-qr-img">
+      <img src="https://qr-official.line.me/gs/M_409jyppa_BW.png?oat_content=qr" alt="LINE QR">
+    </div>
+    <div class="line-qr-text">
+      <strong>ご注文・お問い合わせはこちら</strong><br>
+      左記QRコードをスマートフォンで<br>
+      読み取り、LINEにてご連絡ください。<br>
+      またはSMS（ショートメール）<br>
+      <strong>090-4767-0856</strong> までお気軽にどうぞ。
+    </div>
+  </div>
+  <div class="company">
+    有限会社 佐竹農園　　和歌山市 島 201<br>
+    TEL 073-460-4832　　FAX 073-460-7569　　生産者直通 090-4767-0856
+  </div>
+</div>
+
+<script>window.onload = () => { window.print(); }<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=800,height=900');
+  win.document.write(html);
+  win.document.close();
+}
+
+document.getElementById('btn-print-hist').onclick = printPestHistory;
+
+// ── 顧客向けSMS連絡 & 写真付き完了報告 ────────────────────
+function buildSmsLink(phone, message) {
+  const num = (phone || '').replace(/[^0-9+]/g, '');
+  return 'sms:' + num + '?body=' + encodeURIComponent(message);
+}
+
+function getCurrentOrder() {
+  return orders.find(o => o.id === editingOrderId);
+}
+
+function getActualDateValue() {
+  return document.getElementById('sms-actual-date').value || today();
+}
+
+document.getElementById('btn-sms-confirm').onclick = () => {
+  const o = getCurrentOrder();
+  if (!o) { alert('注文を保存してからご利用ください'); return; }
+  if (!o.phone) { alert('携帯電話番号が入力されていません'); return; }
+  const orderDate = getActualDateValue();
+  const lines = [
+    'いつもお世話になっております。佐竹農園です。',
+    fmtJP(orderDate) + ' 付けでご注文を承りました。',
+    '',
+    '【ご注文内容】',
+    '品目: ' + (o.crop || '') + (o.variety ? '（' + o.variety + '）' : ''),
+    o.type ? '苗規格: ' + o.type : '',
+    o.qty  ? '数量: ' + o.qty : '',
+    o.sowDate    ? '播種予定: '   + fmtJP(o.sowDate)   : '',
+    o.shipDate   ? '出荷予定日: ' + fmtJP(o.shipDate)  : (o.delivery ? '納品予定日: ' + fmtJP(o.delivery) : ''),
+    '',
+    'よろしくお願いいたします。'
+  ].filter(Boolean);
+  window.location.href = buildSmsLink(o.phone, lines.join('\n'));
+};
+
+// 写真アップロード → SMSリンク送信
+let pendingPhotoCtx = null; // { stage, order }
+
+async function uploadPhotoToDrive(file, fileName) {
+  // 1. メタデータでファイル作成
+  const metaRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + gdriveAccessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: fileName, mimeType: file.type || 'image/jpeg' })
+  });
+  if (!metaRes.ok) throw new Error('ファイル作成失敗: ' + metaRes.status);
+  const fileObj = await metaRes.json();
+
+  // 2. 画像データをアップロード
+  const upRes = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files/' + fileObj.id + '?uploadType=media',
+    { method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + gdriveAccessToken, 'Content-Type': file.type || 'image/jpeg' },
+      body: file });
+  if (!upRes.ok) throw new Error('アップロード失敗: ' + upRes.status);
+
+  // 3. 公開リンク権限を付与（リンクを知っている人は誰でも閲覧可）
+  const permRes = await fetch(
+    'https://www.googleapis.com/drive/v3/files/' + fileObj.id + '/permissions',
+    { method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + gdriveAccessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' }) });
+  if (!permRes.ok) throw new Error('権限設定失敗: ' + permRes.status);
+
+  // 4. 共有リンク取得
+  const linkRes = await fetch(
+    'https://www.googleapis.com/drive/v3/files/' + fileObj.id + '?fields=webViewLink',
+    { headers: { 'Authorization': 'Bearer ' + gdriveAccessToken } });
+  const linkData = await linkRes.json();
+  return linkData.webViewLink;
+}
+
+async function processPhotoUpload(file, stage, order, actualDate) {
+  // ローディング表示
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;font-size:14px';
+  overlay.innerHTML = '<div style="font-size:40px">📤</div><div style="margin-top:10px">写真をアップロード中...</div>';
+  document.body.appendChild(overlay);
+
+  try {
+    const stageLabels = { graft: '接ぎ木完了', pot: '鉢上げ・定植完了', ship: '出荷完了' };
+    const stageLabel = stageLabels[stage] || '完了報告';
+    const safeName = (order.customer || 'no-customer').replace(/[\\/:*?"<>|]/g, '_');
+    const dateForFile = actualDate || today();
+    const fileName = stageLabel + '_' + (order.crop || '') + '_' + safeName + '_' + dateForFile + '.jpg';
+
+    const link = await uploadPhotoToDrive(file, fileName);
+
+    // 注文の対応する日付フィールドを更新（実際の作業日を記録）
+    const dateField = stage === 'graft' ? 'graftDate'
+                    : stage === 'pot'   ? 'potDate'
+                    : stage === 'ship'  ? 'shipDate' : null;
+    if (dateField && actualDate) {
+      const idx = orders.findIndex(o => o.id === order.id);
+      if (idx >= 0) {
+        orders[idx] = { ...orders[idx], [dateField]: actualDate, updatedAt: new Date().toISOString() };
+        lsSet('nae-orders', orders);
+        renderCalendar();
+        // 編集中フォームの該当フィールドも更新
+        const formField = stage === 'graft' ? 'f-graft'
+                        : stage === 'pot'   ? 'f-pot'
+                        : stage === 'ship'  ? 'f-ship' : null;
+        if (formField) document.getElementById(formField).value = actualDate;
+      }
+    }
+
+    const dateLabel = fmtJP(actualDate || today());
+    const lines = [
+      'いつもお世話になっております。佐竹農園です。',
+      '',
+      '【' + stageLabel + 'のご報告】',
+      '品目: ' + (order.crop || '') + (order.variety ? '（' + order.variety + '）' : ''),
+      order.qty ? '数量: ' + order.qty : '',
+      dateLabel + ' に ' + stageLabel + ' いたしました。',
+      '',
+      '写真はこちらでご確認いただけます:',
+      link,
+      '',
+      'よろしくお願いいたします。'
+    ].filter(Boolean);
+    document.body.removeChild(overlay);
+    window.location.href = buildSmsLink(order.phone, lines.join('\n'));
+  } catch(e) {
+    if (document.body.contains(overlay)) document.body.removeChild(overlay);
+    alert('処理に失敗しました: ' + e.message);
+  }
+}
+
+function takePhotoAndReport(stage) {
+  const o = getCurrentOrder();
+  if (!o) { alert('注文を保存してからご利用ください'); return; }
+  if (!o.phone) { alert('携帯電話番号が入力されていません'); return; }
+  const actualDate = getActualDateValue();
+
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!gdriveAccessToken) {
+      pendingPhotoCtx = { file, stage, order: o, actualDate };
+      gdrivePendingAction = 'photo';
+      if (gdriveTokenClient) gdriveTokenClient.requestAccessToken();
+      else alert('Google認証準備中です。少し待ってから再度お試しください。');
+    } else {
+      processPhotoUpload(file, stage, o, actualDate);
+    }
+  };
+  input.click();
+}
+
+document.getElementById('btn-photo-graft').onclick = () => takePhotoAndReport('graft');
+document.getElementById('btn-photo-pot').onclick   = () => takePhotoAndReport('pot');
+// 出荷完了：SMS送信せず、社内データベースの出荷日のみ更新
+document.getElementById('btn-photo-ship').onclick  = () => {
+  const o = getCurrentOrder();
+  if (!o) { alert('注文を保存してからご利用ください'); return; }
+  const actualDate = getActualDateValue();
+  if (!confirm(fmtJP(actualDate) + ' を出荷日として記録しますか？\n（顧客へのSMS送信はありません）')) return;
+  const idx = orders.findIndex(x => x.id === o.id);
+  if (idx >= 0) {
+    orders[idx] = { ...orders[idx], shipDate: actualDate, updatedAt: new Date().toISOString() };
+    lsSet('nae-orders', orders);
+    document.getElementById('f-ship').value = actualDate;
+    renderCalendar();
+    alert('✅ 出荷日を ' + fmtJP(actualDate) + ' に記録しました。\n農薬使用履歴印刷でこの出荷日が反映されます。');
+  }
+};
+
+// ── ボトムナビ ────────────────────────────────────────
+document.querySelectorAll('.bnav-item').forEach(btn =>
+  btn.onclick = () => showTab(btn.dataset.tab));
+</script>
+</body>
+</html>

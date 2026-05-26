@@ -1,0 +1,9 @@
+name = "silent-rice-45ca"
+main = "worker.js"
+compatibility_date = "2025-05-01"
+account_id = "9acc356d6e97a3e56ecf2fab4d4ee9f9"
+
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = false

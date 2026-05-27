@@ -368,6 +368,46 @@ body{
         <label class="form-label">メモ</label>
         <input class="form-input" id="f-memo" type="text" placeholder="備考など">
       </div>
+
+      <!-- 種子消毒（実生・その他用） -->
+      <div id="f-seed-single-block" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;font-size:13px;margin-bottom:6px">
+          <input type="checkbox" id="f-seed-treat" style="width:20px;height:20px;accent-color:#795548;flex-shrink:0">
+          🧪 種子消毒あり
+        </label>
+        <div id="f-seed-treat-fields" style="display:none">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">有効成分</label>
+            <input class="form-input" id="f-seed-ingr" type="text" placeholder="例：チウラム、ベノミル">
+          </div>
+        </div>
+      </div>
+
+      <!-- 種子消毒（接ぎ木用：穂木・台木） -->
+      <div id="f-seed-graft-block" style="display:none;border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text)">🧪 種子消毒</div>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;margin-bottom:6px">
+          <input type="checkbox" id="f-scion-seed-treat" style="width:20px;height:20px;accent-color:#795548;flex-shrink:0">
+          穂木 種子消毒あり
+        </label>
+        <div id="f-scion-seed-fields" style="display:none;margin-bottom:10px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">穂木 有効成分</label>
+            <input class="form-input" id="f-scion-seed-ingr" type="text" placeholder="例：チウラム">
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;margin-bottom:6px">
+          <input type="checkbox" id="f-stock-seed-treat" style="width:20px;height:20px;accent-color:#795548;flex-shrink:0">
+          台木 種子消毒あり
+        </label>
+        <div id="f-stock-seed-fields" style="display:none">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">台木 有効成分</label>
+            <input class="form-input" id="f-stock-seed-ingr" type="text" placeholder="例：ベノミル">
+          </div>
+        </div>
+      </div>
+
       <!-- 種子発注チェック -->
       <label style="display:flex;align-items:center;gap:12px;padding:12px 4px;cursor:pointer;border-top:1px solid var(--border);margin-top:4px">
         <input type="checkbox" id="f-seed-ordered" style="width:22px;height:22px;accent-color:var(--green);flex-shrink:0">
@@ -1853,6 +1893,22 @@ function openOrderForm(order = null) {
   document.getElementById('f-pot').value      = order?.potDate ?? '';
   document.getElementById('f-memo').value     = order?.memo ?? '';
   document.getElementById('f-seed-ordered').checked = order?.seedOrdered ?? false;
+  // 種子消毒（注文フォーム）
+  const _graftType = isGraft(document.getElementById('f-type').value);
+  document.getElementById('f-seed-single-block').style.display  = _graftType ? 'none' : '';
+  document.getElementById('f-seed-graft-block').style.display   = _graftType ? '' : 'none';
+  const _st = order?.seedTreatment ?? false;
+  document.getElementById('f-seed-treat').checked = _st;
+  document.getElementById('f-seed-treat-fields').style.display = _st ? '' : 'none';
+  document.getElementById('f-seed-ingr').value = order?.seedIngredient ?? '';
+  const _sst = order?.scionSeedTreatment ?? false;
+  document.getElementById('f-scion-seed-treat').checked = _sst;
+  document.getElementById('f-scion-seed-fields').style.display = _sst ? '' : 'none';
+  document.getElementById('f-scion-seed-ingr').value = order?.scionSeedIngredient ?? '';
+  const _tst = order?.stockSeedTreatment ?? false;
+  document.getElementById('f-stock-seed-treat').checked = _tst;
+  document.getElementById('f-stock-seed-fields').style.display = _tst ? '' : 'none';
+  document.getElementById('f-stock-seed-ingr').value = order?.stockSeedIngredient ?? '';
   document.getElementById('btn-print-hist').style.display = order ? '' : 'none';
   lastSuggest = null;
   updateSuggest();
@@ -1969,12 +2025,25 @@ function renderVarietySuggests() {
 }
 document.getElementById('f-crop').addEventListener('change', renderVarietySuggests);
 
-// 規格変更で品種欄を切り替え
+// 規格変更で品種欄・種子消毒欄を切り替え
 function updateVarietyFields() {
   const graft = isGraft(document.getElementById('f-type').value);
-  document.getElementById('variety-row-single').style.display = graft ? 'none' : '';
-  document.getElementById('variety-row-graft').style.display  = graft ? '' : 'none';
+  document.getElementById('variety-row-single').style.display    = graft ? 'none' : '';
+  document.getElementById('variety-row-graft').style.display     = graft ? '' : 'none';
+  document.getElementById('f-seed-single-block').style.display   = graft ? 'none' : '';
+  document.getElementById('f-seed-graft-block').style.display    = graft ? '' : 'none';
 }
+
+// 種子消毒チェック ON/OFF で成分欄を表示切り替え
+document.getElementById('f-seed-treat').addEventListener('change', function() {
+  document.getElementById('f-seed-treat-fields').style.display = this.checked ? '' : 'none';
+});
+document.getElementById('f-scion-seed-treat').addEventListener('change', function() {
+  document.getElementById('f-scion-seed-fields').style.display = this.checked ? '' : 'none';
+});
+document.getElementById('f-stock-seed-treat').addEventListener('change', function() {
+  document.getElementById('f-stock-seed-fields').style.display = this.checked ? '' : 'none';
+});
 
 document.getElementById('btn-cal-add').onclick      = () => openOrderForm();
 document.getElementById('btn-order-add-h').onclick  = () => openOrderForm();
@@ -2017,6 +2086,12 @@ document.getElementById('btn-order-submit').onclick = async () => {
     potDate:   document.getElementById('f-pot').value,
     memo:        document.getElementById('f-memo').value,
     seedOrdered: document.getElementById('f-seed-ordered').checked,
+    seedTreatment:      document.getElementById('f-seed-treat').checked,
+    seedIngredient:     document.getElementById('f-seed-treat').checked ? document.getElementById('f-seed-ingr').value.trim() : '',
+    scionSeedTreatment: document.getElementById('f-scion-seed-treat').checked,
+    scionSeedIngredient:document.getElementById('f-scion-seed-treat').checked ? document.getElementById('f-scion-seed-ingr').value.trim() : '',
+    stockSeedTreatment: document.getElementById('f-stock-seed-treat').checked,
+    stockSeedIngredient:document.getElementById('f-stock-seed-treat').checked ? document.getElementById('f-stock-seed-ingr').value.trim() : '',
     updatedAt:   new Date().toISOString()
   };
 
@@ -2801,19 +2876,31 @@ function printPestHistory() {
   const stockRegNameText = stockReg ? stockReg.regName : '';
   const stockRegNumText  = stockReg ? stockReg.regNumber : '';
 
-  // 種子消毒行を生成（品種マスターから取得）
-  // 農薬名列=成分名、有効成分列=空、散布日列=処理時期、希釈倍率列=穂木/台木・種子消毒
-  function seedRow(varReg, varName) {
-    if (!varReg?.seedTreatment) return '';
-    const timing    = varReg.seedTiming || '播種前（種子）';
-    const ingr      = varReg.seedIngredient || '—';
+  // 種子消毒行を生成
+  // 注文データを優先、なければ品種マスターを参照
+  function seedRow(hasTreat, ingr, timing, varName) {
+    if (!hasTreat) return '';
     const kindLabel = varName ? `${varName}・種子消毒` : '種子消毒';
-    return `<tr style="background:#fffde7"><td>${ingr}</td><td></td><td>${timing}</td><td>${kindLabel}</td></tr>`;
+    return `<tr style="background:#fffde7"><td>${ingr || '—'}</td><td></td><td>${timing || '播種前（種子）'}</td><td>${kindLabel}</td></tr>`;
   }
-  const seedLines = [
-    seedRow(scionReg, isGraft(order.type) ? '穂木' : ''),
-    seedRow(stockReg, isGraft(order.type) ? '台木' : ''),
-  ].filter(Boolean).join('');
+  const _graft = isGraft(order.type);
+  let seedLines;
+  if (_graft) {
+    // 接ぎ木：穂木・台木それぞれ（注文データ優先 → 品種マスタ）
+    const scionTreat = order.scionSeedTreatment ?? scionReg?.seedTreatment ?? false;
+    const scionIngr  = order.scionSeedIngredient || scionReg?.seedIngredient || '';
+    const stockTreat = order.stockSeedTreatment ?? stockReg?.seedTreatment ?? false;
+    const stockIngr  = order.stockSeedIngredient || stockReg?.seedIngredient || '';
+    seedLines = [
+      seedRow(scionTreat, scionIngr, scionReg?.seedTiming, '穂木'),
+      seedRow(stockTreat, stockIngr, stockReg?.seedTiming, '台木'),
+    ].filter(Boolean).join('');
+  } else {
+    // 実生：単一（注文データ優先 → 品種マスタ）
+    const treat = order.seedTreatment ?? scionReg?.seedTreatment ?? false;
+    const ingr  = order.seedIngredient || scionReg?.seedIngredient || '';
+    seedLines = seedRow(treat, ingr, scionReg?.seedTiming, '');
+  }
 
   const pestLines = usedPests.map(p => {
     const name       = p.pestName || "";
@@ -2824,7 +2911,8 @@ function printPestHistory() {
     const dilution = masterDilution || p.dilution || "";
     return `<tr><td>${name}</td><td>${ingredient}</td><td>${fmtPrint(p.date)}</td><td>${dilution}</td></tr>`;
   }).join("");
-  const totalRows  = usedPests.length + [scionReg, stockReg].filter(r => r?.seedTreatment).length;
+  const seedRowCount = seedLines ? seedLines.split('<tr').length - 1 : 0;
+  const totalRows  = usedPests.length + seedRowCount;
   const emptyRows = Math.max(0, 11 - totalRows);
   const blankRows = Array(emptyRows).fill('<tr><td></td><td></td><td></td><td></td></tr>').join('');
 

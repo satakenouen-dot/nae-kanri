@@ -2102,6 +2102,57 @@ document.getElementById('btn-order-submit').onclick = async () => {
     orders.push({ id: genId(), ...data });
   }
   saveOrders();
+
+  // 品種名を品種マスタに自動登録（未登録のみ）
+  (function autoRegisterVarieties() {
+    const toRegister = [];
+    if (isGraft(data.type)) {
+      if (data.varietyScion) toRegister.push({
+        name: data.varietyScion,
+        seedTreatment: data.scionSeedTreatment,
+        seedIngredient: data.scionSeedIngredient
+      });
+      if (data.varietyStock) toRegister.push({
+        name: data.varietyStock,
+        seedTreatment: data.stockSeedTreatment,
+        seedIngredient: data.stockSeedIngredient
+      });
+    } else {
+      if (data.variety) toRegister.push({
+        name: data.variety,
+        seedTreatment: data.seedTreatment,
+        seedIngredient: data.seedIngredient
+      });
+    }
+
+    let changed = false;
+    toRegister.forEach(({ name, seedTreatment, seedIngredient }) => {
+      if (!name) return;
+      const existing = varietyMaster.find(v => v.salesName === name);
+      if (!existing) {
+        // 新規追加
+        varietyMaster.push({
+          id: genId(),
+          salesName: name,
+          regName: '',
+          regNumber: '',
+          seedTreatment: seedTreatment || false,
+          seedIngredient: seedIngredient || '',
+          seedTiming: seedTreatment ? '播種前（種子）' : '',
+          updatedAt: new Date().toISOString()
+        });
+        changed = true;
+      } else if (seedTreatment && !existing.seedTreatment) {
+        // 既存品種に種子消毒情報を追記（未設定だった場合のみ）
+        existing.seedTreatment = true;
+        existing.seedIngredient = seedIngredient || existing.seedIngredient;
+        existing.seedTiming = existing.seedTiming || '播種前（種子）';
+        changed = true;
+      }
+    });
+    if (changed) saveVarietyMaster();
+  })();
+
   renderCalendar();
   showTab(currentTab === 'calendar' ? 'calendar' : 'orders');
 

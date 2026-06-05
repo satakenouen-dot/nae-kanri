@@ -64,6 +64,7 @@ body{
 .ev-tag.接ぎ木{background:var(--orange-l);color:var(--orange);border-color:var(--orange)}
 .ev-tag.出荷{background:var(--red-l);color:var(--red);border-color:var(--red)}
 .ev-tag.農薬{background:var(--purple-l);color:var(--purple);border-color:var(--purple)}
+.ev-tag.ベスト{background:#FFF8E1;color:#F57F17;border-color:#F9A825}
 .more-badge{font-size:8px;color:var(--text2);text-align:right;padding:0 2px}
 .legend{background:#fff;border-top:1px solid var(--border);padding:6px 12px;display:flex;gap:10px;flex-wrap:wrap}
 .leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)}
@@ -135,11 +136,13 @@ body{
 .ev-card.接ぎ木{background:var(--orange-l);border-color:var(--orange)}
 .ev-card.出荷{background:var(--red-l);border-color:var(--red)}
 .ev-card.農薬{background:var(--purple-l);border-color:var(--purple)}
+.ev-card.ベスト{background:#FFF8E1;border-color:#F9A825}
 .ev-card-type{font-size:11px;font-weight:600;margin-bottom:4px}
 .ev-card.播種 .ev-card-type{color:var(--blue)}
 .ev-card.接ぎ木 .ev-card-type{color:var(--orange)}
 .ev-card.出荷 .ev-card-type{color:var(--red)}
 .ev-card.農薬 .ev-card-type{color:var(--purple)}
+.ev-card.ベスト .ev-card-type{color:#F57F17}
 .ev-card-main{font-size:14px;font-weight:600}
 .ev-card-sub{font-size:12px;color:var(--text2);margin-top:2px}
 .import-drop{border:2px dashed var(--border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all .2s}
@@ -228,6 +231,7 @@ body{
       <div class="leg-item"><div class="leg-dot" style="background:var(--orange-l);border-color:var(--orange)"></div>接ぎ木</div>
       <div class="leg-item"><div class="leg-dot" style="background:var(--red-l);border-color:var(--red)"></div>出荷</div>
       <div class="leg-item"><div class="leg-dot" style="background:var(--purple-l);border-color:var(--purple)"></div>農薬</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#FFF8E1;border-color:#F9A825"></div>ベスト出荷</div>
     </div>
   </div>
   <button class="fab" id="btn-cal-add">＋</button>
@@ -354,6 +358,11 @@ body{
       <div class="form-group">
         <label class="form-label">出荷日</label>
         <input class="form-input" id="f-ship" type="date">
+      </div>
+      <div class="form-group" style="background:#FFF8E1;border:1px solid #F9A825;border-radius:10px;padding:10px 12px">
+        <label class="form-label" style="color:#F57F17;font-weight:700">⭐ ベスト出荷日（理想のタイミング）</label>
+        <input class="form-input" id="f-best" type="date">
+        <div style="font-size:11px;color:#8d6e0a;margin-top:5px;line-height:1.5">本当はこの日に出荷するのが理想だった、という日付。今後の播種日予測はこのベスト日を優先して学習します。</div>
       </div>
       <div class="form-group">
         <label class="form-label">鉢上げ日</label>
@@ -835,6 +844,7 @@ let pestLogs       = [];
 let pestMaster     = [];
 let varietyMaster  = [];
 let leadStats      = {};
+let bestStats      = {};   // ベスト出荷日からの学習統計（計算で生成）
 let viewYear       = new Date().getFullYear();
 let viewMonth      = new Date().getMonth() + 1;
 let currentTab     = 'calendar';
@@ -947,6 +957,7 @@ function initApp() {
     pestMaster = lsGet('nae-pestmaster', []);
     varietyMaster = lsGet('nae-varietymaster', []);
     leadStats  = lsGet('nae-leadstats', {});
+    computeBestStats();
 
     // タキイプリセット品種を未登録分だけ追加
     let added = 0;
@@ -1222,6 +1233,7 @@ async function doGdriveRestore() {
     if (Array.isArray(data.pestMaster)) { pestMaster = data.pestMaster; savePestMaster(); }
     if (Array.isArray(data.varietyMaster)) { varietyMaster = data.varietyMaster; saveVarietyMaster(); }
     if (data.leadStats && typeof data.leadStats === 'object') { leadStats = data.leadStats; saveLeadStats(); }
+    computeBestStats();
 
     lsSet('nae-last-restore-check', Date.now());
     renderCalendar();
@@ -1513,6 +1525,7 @@ document.getElementById('backup-file').addEventListener('change', e => {
       if (Array.isArray(data.pestMaster)){ pestMaster = data.pestMaster; savePestMaster(); }
       if (Array.isArray(data.varietyMaster)){ varietyMaster = data.varietyMaster; saveVarietyMaster(); }
       if (data.leadStats && typeof data.leadStats === 'object') { leadStats = data.leadStats; saveLeadStats(); }
+      computeBestStats();
       renderImportCurrentStats();
       renderCalendar();
       alert('✅ 復元が完了しました！');
@@ -1707,6 +1720,28 @@ const GRAFT_DAYS = {
 
 function isGraft(type) { return type ? /接ぎ|接木/i.test(type) : false; }
 
+// ── ベスト出荷日からの学習統計を再計算 ────────────────
+function computeBestStats() {
+  const acc = {};
+  for (const o of orders) {
+    if (!o.bestShipDate || !o.sowDate) continue;
+    const days = Math.round((parseLocalDate(o.bestShipDate) - parseLocalDate(o.sowDate)) / 86400000);
+    if (days < 5 || days > 400) continue;
+    const k = statsKey(o.crop, o.type, getSeason(o.bestShipDate));
+    (acc[k] = acc[k] || []).push(days);
+  }
+  bestStats = {};
+  for (const k in acc) {
+    const d = acc[k];
+    bestStats[k] = {
+      avg: d.reduce((a, b) => a + b, 0) / d.length,
+      min: Math.min(...d),
+      max: Math.max(...d),
+      count: d.length
+    };
+  }
+}
+
 // ── 播種日提案 ────────────────────────────────────────
 function calcSuggest(crop, type, delivery) {
   if (!crop || !delivery) return null;
@@ -1715,18 +1750,30 @@ function calcSuggest(crop, type, delivery) {
   const keyS    = statsKey(crop, type, season);   // 季節あり
   const keyBase = statsKey(crop, type);            // 季節なし（既存Firestoreデータ用）
 
-  // 優先順位: ①Firestore季節あり → ②内蔵SEASONAL_STATS → ③Firestore季節なし → ④DEFAULT_LEADS
+  // 優先順位: ⓪ベスト出荷学習 → ①Firestore季節あり → ②内蔵SEASONAL_STATS → ③季節なし → ④DEFAULT_LEADS
   let avgDays, note;
   const statS = leadStats[keyS];
   const statB = leadStats[keyBase];
+  const best  = bestStats[keyS];
 
-  if (statS && statS.count >= 1) {
+  if (best && best.count >= 1) {
+    // ⭐ ベスト出荷日の実績を最優先。5件未満は過去実績と加重ブレンド（ベスト3倍重み）
+    const base = (statS && statS.count >= 1) ? statS : (SEASONAL_STATS[keyS] || null);
+    if (best.count >= 5 || !base) {
+      avgDays = Math.round(best.avg);
+      note = `⭐【${season}】ベスト出荷の実績 ${best.count}件（平均${avgDays}日前、範囲：${best.min}〜${best.max}日前）`;
+    } else {
+      const w = 3, wc = best.count * w;
+      avgDays = Math.round((best.avg * wc + base.avg * base.count) / (wc + base.count));
+      note = `⭐【${season}】ベスト出荷 ${best.count}件 ＋ 過去実績 ${base.count}件を加重 → 平均${avgDays}日前`;
+    }
+  } else if (statS && statS.count >= 1) {
     avgDays = Math.round(statS.avg);
     note = `📊 【${season}】取り込みデータ ${statS.count}件（平均${avgDays}日前、範囲：${statS.min}〜${statS.max}日前）`;
   } else if (SEASONAL_STATS[keyS]) {
     const bs = SEASONAL_STATS[keyS];
     avgDays = bs.avg;
-    note = `📊 【${season}】過去4年の実績 ${bs.count}件（平均${avgDays}日前、範囲：${bs.min}〜${bs.max}日前）`;
+    note = `📊 【${season}】過去の実績 ${bs.count}件（平均${avgDays}日前、範囲：${bs.min}〜${bs.max}日前）`;
   } else if (statB && statB.count >= 2) {
     avgDays = Math.round(statB.avg);
     note = `📊 取り込みデータ ${statB.count}件（平均${avgDays}日前、季節別データなし）`;
@@ -1789,6 +1836,7 @@ function renderCalendar() {
     if (o.sowDate)   addEv(o.sowDate,   { type: '播種',  label: o.crop, id: o.id, order: o });
     if (o.graftDate) addEv(o.graftDate, { type: '接ぎ木', label: o.crop, id: o.id, order: o });
     addEv(o.shipDate || o.delivery,     { type: '出荷',  label: o.crop, id: o.id, order: o });
+    if (o.bestShipDate) addEv(o.bestShipDate, { type: 'ベスト', label: o.crop, id: o.id, order: o });
   }
   for (const p of pestLogs) {
     addEv(p.date, { type: '農薬', label: p.pestName || '農薬', log: p });
@@ -1904,6 +1952,7 @@ function openOrderForm(order = null) {
   document.getElementById('f-sow').value      = order?.sowDate ?? '';
   document.getElementById('f-graft').value    = order?.graftDate ?? '';
   document.getElementById('f-ship').value     = order?.shipDate ?? '';
+  document.getElementById('f-best').value     = order?.bestShipDate ?? '';
   document.getElementById('f-pot').value      = order?.potDate ?? '';
   document.getElementById('f-memo').value     = order?.memo ?? '';
   document.getElementById('f-seed-ordered').checked = order?.seedOrdered ?? false;
@@ -2068,6 +2117,7 @@ document.getElementById('btn-order-delete').onclick = () => {
   if (!confirm('この注文を削除しますか？')) return;
   orders = orders.filter(o => o.id !== editingOrderId);
   saveOrders();
+  computeBestStats();
   renderCalendar();
   showTab('orders');
 };
@@ -2097,6 +2147,7 @@ document.getElementById('btn-order-submit').onclick = async () => {
     sowDate:   document.getElementById('f-sow').value,
     graftDate: document.getElementById('f-graft').value,
     shipDate:  document.getElementById('f-ship').value,
+    bestShipDate: document.getElementById('f-best').value,
     potDate:   document.getElementById('f-pot').value,
     memo:        document.getElementById('f-memo').value,
     seedOrdered: document.getElementById('f-seed-ordered').checked,
@@ -2116,6 +2167,7 @@ document.getElementById('btn-order-submit').onclick = async () => {
     orders.push({ id: genId(), ...data });
   }
   saveOrders();
+  computeBestStats();   // ベスト出荷日の学習を更新
 
   // 品種名を品種マスタに自動登録（未登録のみ）
   (function autoRegisterVarieties() {

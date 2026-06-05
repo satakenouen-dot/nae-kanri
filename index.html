@@ -212,14 +212,14 @@ body{
     <div class="weekday">木</div><div class="weekday">金</div><div class="weekday">土</div><div class="weekday">日</div>
   </div>
   <!-- 起動時復元バナー -->
-  <div id="gdrive-restore-banner" style="display:none;background:#E3F2FD;border-bottom:2px solid #1565C0;padding:12px 16px;align-items:center;gap:10px">
-    <span style="font-size:22px">☁️</span>
-    <div style="flex:1;font-size:13px;line-height:1.5">
-      <strong>データがありません</strong><br>
-      Googleドライブから前回のバックアップを復元しますか？
+  <div id="gdrive-restore-banner" style="display:none;background:#E3F2FD;border-bottom:2px solid #1565C0;padding:10px 14px;align-items:center;gap:8px">
+    <span style="font-size:20px;flex-shrink:0">☁️</span>
+    <div style="flex:1;font-size:12px;line-height:1.5">
+      <strong style="font-size:13px">Googleドライブから最新データを取得</strong><br>
+      スマホ・PC間でデータを同期できます
     </div>
-    <button id="btn-restore-banner" style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">復元する</button>
-    <button id="btn-restore-banner-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#555;padding:4px">✕</button>
+    <button id="btn-restore-banner" style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">取得する</button>
+    <button id="btn-restore-banner-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#777;padding:4px;flex-shrink:0">✕</button>
   </div>
   <div style="flex:1;overflow-y:auto;padding-bottom:8px">
     <div class="cal-grid" id="cal-grid"></div>
@@ -969,8 +969,9 @@ function initApp() {
     renderCalendar();
     showScreen('screen-calendar');
 
-    // 起動時：データが空ならGoogleドライブ復元を促す
-    if (orders.length === 0 && pestLogs.length === 0) {
+    // 起動時：前回チェックから1時間以上経過していたら復元バナーを表示
+    const _lastCheck = lsGet('nae-last-restore-check', 0);
+    if (Date.now() - _lastCheck > 60 * 60 * 1000) {
       showGdriveRestoreBanner();
     }
   } catch(e) {
@@ -1222,6 +1223,7 @@ async function doGdriveRestore() {
     if (Array.isArray(data.varietyMaster)) { varietyMaster = data.varietyMaster; saveVarietyMaster(); }
     if (data.leadStats && typeof data.leadStats === 'object') { leadStats = data.leadStats; saveLeadStats(); }
 
+    lsSet('nae-last-restore-check', Date.now());
     renderCalendar();
     alert('✅ 復元完了\n注文: ' + (data.orders?.length || 0) + '件\n農薬: ' + (data.pestLogs?.length || 0) + '件');
   } catch(e) {
@@ -1237,6 +1239,7 @@ function showGdriveRestoreBanner() {
 
   document.getElementById('btn-restore-banner').onclick = () => {
     banner.style.display = 'none';
+    lsSet('nae-last-restore-check', Date.now());
     if (!gdriveTokenClient) {
       alert('Google APIの初期化中です。少し待ってから再度お試しください。');
       return;
@@ -1248,6 +1251,7 @@ function showGdriveRestoreBanner() {
 
   document.getElementById('btn-restore-banner-close').onclick = () => {
     banner.style.display = 'none';
+    lsSet('nae-last-restore-check', Date.now()); // スキップしても1時間は出さない
   };
 }
 

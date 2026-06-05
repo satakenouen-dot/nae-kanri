@@ -270,6 +270,19 @@ body{
         <input class="form-input" id="f-phone" type="tel" placeholder="090-1234-5678" inputmode="tel">
       </div>
       <div class="form-group">
+        <label class="form-label">規格（種類）</label>
+        <select class="form-select" id="f-type-sel">
+          <option value="">選択（任意）</option>
+          <option>9cm実生</option><option>9cm接ぎ</option>
+          <option>10.5cm実生</option><option>10.5cm接ぎ</option>
+          <option>128穴</option><option>SH128穴</option><option>DP128穴</option>
+          <option>72穴実生</option><option>200穴実生</option><option>200穴接ぎ</option>
+          <option>12cm実生</option>
+          <option value="__custom__">✏️ 直接入力…</option>
+        </select>
+        <input class="form-input" id="f-type" type="text" placeholder="規格を入力" autocomplete="off" style="display:none;margin-top:4px">
+      </div>
+      <div class="form-group">
         <label class="form-label">品目 ＊</label>
         <select class="form-select" id="f-crop">
           <option value="">選択してください</option>
@@ -295,24 +308,9 @@ body{
           </div>
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">数量</label>
-          <input class="form-input" id="f-qty" type="text" placeholder="例：100本">
-        </div>
-        <div class="form-group">
-          <label class="form-label">規格（種類）</label>
-          <select class="form-select" id="f-type-sel">
-            <option value="">選択（任意）</option>
-            <option>9cm実生</option><option>9cm接ぎ</option>
-            <option>10.5cm実生</option><option>10.5cm接ぎ</option>
-            <option>128穴</option><option>SH128穴</option><option>DP128穴</option>
-            <option>72穴実生</option><option>200穴実生</option><option>200穴接ぎ</option>
-            <option>12cm実生</option>
-            <option value="__custom__">✏️ 直接入力…</option>
-          </select>
-          <input class="form-input" id="f-type" type="text" placeholder="規格を入力" autocomplete="off" style="display:none;margin-top:4px">
-        </div>
+      <div class="form-group">
+        <label class="form-label">数量</label>
+        <input class="form-input" id="f-qty" type="text" placeholder="例：100本">
       </div>
       <div class="form-group">
         <label class="form-label">単価（円）</label>

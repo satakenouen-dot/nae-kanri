@@ -1002,7 +1002,7 @@ document.getElementById('btn-export-data').onclick = () => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'nae-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = 'nae-backup-' + today() + '.json';
   a.click();
 };
 
@@ -1067,7 +1067,7 @@ document.getElementById('btn-export-excel').onclick = () => {
     }]);
     XLSX.utils.book_append_sheet(wb, wsMaster, '農薬マスター');
 
-    const fileName = 'nae-kanri-' + new Date().toISOString().slice(0,10) + '.xlsx';
+    const fileName = 'nae-kanri-' + today() + '.xlsx';
     XLSX.writeFile(wb, fileName);
   } catch(err) {
     alert('書き出しに失敗しました: ' + err.message);
@@ -1144,11 +1144,7 @@ async function doGdriveBackup() {
     };
     const json = JSON.stringify(data, null, 2);
 
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const stamp = now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) +
-      '_' + pad(now.getHours()) + pad(now.getMinutes());
-    const fileName = 'nae-backup-' + stamp + '.json';
+    const fileName = 'nae-backup-' + jstStamp(false) + '.json';
 
     const boundary = 'naebound' + Date.now();
     const metadata = { name: fileName, mimeType: 'application/json',
@@ -1210,7 +1206,7 @@ async function doGdriveRestore() {
       return;
     }
     const choices = list.files.map((f, i) =>
-      (i+1) + '. ' + f.name + ' (' + f.createdTime.slice(0,16).replace('T',' ') + ')'
+      (i+1) + '. ' + f.name + ' (' + fmtJST(f.createdTime) + ')'
     ).join('\n');
     const choice = prompt('復元するバックアップ番号を入力してください（1〜' + list.files.length + '）:\n\n' + choices);
     if (!choice) return;
@@ -1275,11 +1271,7 @@ async function autoBackupSilent() {
   if (orders.length === 0 && pestLogs.length === 0) return;
   autoBackupDone = true;
   try {
-    const now = new Date();
-    const pad = n => String(n).padStart(2,'0');
-    const stamp = now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) +
-                  '_' + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
-    const fileName = 'nae-backup_' + stamp + '.json';
+    const fileName = 'nae-backup_' + jstStamp(true) + '.json';
     const payload = JSON.stringify({ orders, pestLogs, pestMaster, varietyMaster, leadStats });
     const boundary = 'bauto' + Date.now();
     const meta = JSON.stringify({ name: fileName, mimeType: 'application/json' });
@@ -1561,6 +1553,26 @@ function fmtJP(s) {
   return `${parseInt(m)}月${parseInt(d)}日`;
 }
 function today() { return dateToLocal(new Date()); }
+// UTC(ISO)文字列を日本時間の "YYYY/MM/DD HH:mm" で表示
+function fmtJST(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleString('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    });
+  } catch(e) { return iso.slice(0,16).replace('T',' '); }
+}
+// 日本時間のファイル名用タイムスタンプ "YYYYMMDD_HHmm(ss)"（端末TZに依存しない）
+function jstStamp(withSeconds) {
+  const d = new Date(Date.now() + 9 * 3600 * 1000); // エポックを+9hしてJST壁時計をUTC成分で読む
+  const p = n => String(n).padStart(2, '0');
+  let s = d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) +
+          '_' + p(d.getUTCHours()) + p(d.getUTCMinutes());
+  if (withSeconds) s += p(d.getUTCSeconds());
+  return s;
+}
 
 function normalizeType(t) {
   if (!t) return '—';

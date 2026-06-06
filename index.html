@@ -231,7 +231,6 @@ body{
       <div class="leg-item"><div class="leg-dot" style="background:var(--orange-l);border-color:var(--orange)"></div>接ぎ木</div>
       <div class="leg-item"><div class="leg-dot" style="background:var(--red-l);border-color:var(--red)"></div>出荷</div>
       <div class="leg-item"><div class="leg-dot" style="background:var(--purple-l);border-color:var(--purple)"></div>農薬</div>
-      <div class="leg-item"><div class="leg-dot" style="background:#FFF8E1;border-color:#F9A825"></div>ベスト出荷</div>
     </div>
   </div>
   <button class="fab" id="btn-cal-add">＋</button>
@@ -1848,7 +1847,6 @@ function renderCalendar() {
     if (o.sowDate)   addEv(o.sowDate,   { type: '播種',  label: o.crop, id: o.id, order: o });
     if (o.graftDate) addEv(o.graftDate, { type: '接ぎ木', label: o.crop, id: o.id, order: o });
     addEv(o.shipDate || o.delivery,     { type: '出荷',  label: o.crop, id: o.id, order: o });
-    if (o.bestShipDate) addEv(o.bestShipDate, { type: 'ベスト', label: o.crop, id: o.id, order: o });
   }
   for (const p of pestLogs) {
     addEv(p.date, { type: '農薬', label: p.pestName || '農薬', log: p });

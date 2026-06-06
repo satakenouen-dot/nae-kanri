@@ -2253,7 +2253,7 @@ function renderOrderList() {
   const filtered = [...orders]
     .filter(o => !q || [o.crop, o.variety, o.customer].some(v => (v||'').toLowerCase().includes(q)));
 
-  const pending  = filtered.filter(o => orderStatus(o) === 'pending') .sort((a,b)=>(a.delivery||'').localeCompare(b.delivery||''));
+  const pending  = filtered.filter(o => orderStatus(o) === 'pending') .sort((a,b)=>(a.sowDate||'9999').localeCompare(b.sowDate||'9999'));
   const growing  = filtered.filter(o => orderStatus(o) === 'growing') .sort((a,b)=>(a.delivery||'').localeCompare(b.delivery||''));
   const shipped  = filtered.filter(o => orderStatus(o) === 'shipped') .sort((a,b)=>(b.shipDate||'').localeCompare(a.shipDate||''));
 

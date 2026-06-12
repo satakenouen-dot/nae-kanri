@@ -1206,18 +1206,29 @@ async function doGdriveRestore() {
       alert('Googleドライブにバックアップファイルが見つかりません');
       return;
     }
-    const choices = list.files.map((f, i) =>
-      (i+1) + '. ' + f.name + ' (' + fmtJST(f.createdTime) + ')'
-    ).join('\n');
-    const choice = prompt('復元するバックアップ番号を入力してください（1〜' + list.files.length + '）:\n\n' + choices);
-    if (!choice) return;
-    const idx = parseInt(choice) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= list.files.length) {
-      alert('無効な番号です');
-      return;
+    // 最新のバックアップを自動選択（確認1回だけ）
+    let file = list.files[0];
+    const ok = confirm(
+      '最新のバックアップから復元します。\n\n' +
+      '📄 ' + file.name + '\n🕐 ' + fmtJST(file.createdTime) + '\n\n' +
+      '現在のデータはすべて上書きされます。よろしいですか？\n\n' +
+      '（古いバックアップから選びたい場合は「キャンセル」）'
+    );
+    if (!ok) {
+      // キャンセル時のみ従来の番号選択
+      const choices = list.files.map((f, i) =>
+        (i+1) + '. ' + f.name + ' (' + fmtJST(f.createdTime) + ')'
+      ).join('\n');
+      const choice = prompt('復元するバックアップ番号を入力してください（1〜' + list.files.length + '）:\n\n' + choices);
+      if (!choice) return;
+      const idx = parseInt(choice) - 1;
+      if (isNaN(idx) || idx < 0 || idx >= list.files.length) {
+        alert('無効な番号です');
+        return;
+      }
+      file = list.files[idx];
+      if (!confirm('「' + file.name + '」から復元しますか？\n現在のデータはすべて上書きされます。')) return;
     }
-    const file = list.files[idx];
-    if (!confirm('「' + file.name + '」から復元しますか？\n現在のデータはすべて上書きされます。')) return;
 
     const dlRes = await fetch(
       'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media',

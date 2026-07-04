@@ -105,7 +105,7 @@ body{
 .suggest-badge.接ぎ木{background:var(--orange-l);color:var(--orange)}
 .suggest-badge.出荷{background:var(--red-l);color:var(--red)}
 .suggest-date{font-size:13px;font-weight:500}
-.suggest-note{font-size:10px;color:#388E3C;margin-top:6px;line-height:1.5}
+.suggest-note{font-size:10px;color:#388E3C;margin-top:6px;line-height:1.5;white-space:pre-line}
 .submit-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--border);padding:10px 14px calc(10px + var(--safe-b));z-index:10}
 .btn-primary{width:100%;padding:14px;background:var(--green);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
 .btn-primary:active{background:var(--green-d)}
@@ -364,6 +364,18 @@ body{
         <label class="form-label" style="color:#F57F17;font-weight:700">⭐ ベスト出荷日（理想のタイミング）</label>
         <input class="form-input" id="f-best" type="date">
         <div style="font-size:11px;color:#8d6e0a;margin-top:5px;line-height:1.5">本当はこの日に出荷するのが理想だった、という日付。今後の播種日予測はこのベスト日を優先して学習します。</div>
+        <div class="form-row" style="margin-top:10px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" style="color:#F57F17">播種数量（粒・本）</label>
+            <input class="form-input" id="f-sow-qty" type="number" inputmode="numeric" placeholder="例：550">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" style="color:#F57F17">出荷数量（本）</label>
+            <input class="form-input" id="f-ship-qty" type="number" inputmode="numeric" placeholder="例：500">
+          </div>
+        </div>
+        <div id="f-yield-display" style="font-size:12px;font-weight:700;color:#F57F17;margin-top:6px;display:none"></div>
+        <div style="font-size:11px;color:#8d6e0a;margin-top:4px;line-height:1.5">種子の品質や気候による発芽・仕上がりの差を記録。次期の播種数量の目安として提案時に表示されます。</div>
       </div>
       <div class="form-group">
         <label class="form-label">鉢上げ日</label>
@@ -846,6 +858,7 @@ let pestMaster     = [];
 let varietyMaster  = [];
 let leadStats      = {};
 let bestStats      = {};   // ベスト出荷日からの学習統計（計算で生成）
+let yieldStats     = {};   // 播種数量→出荷数量の出荷率統計（計算で生成）
 let viewYear       = new Date().getFullYear();
 let viewMonth      = new Date().getMonth() + 1;
 let currentTab     = 'calendar';
@@ -1777,7 +1790,19 @@ function isGraft(type) { return type ? /接ぎ|接木/i.test(type) : false; }
 // ── ベスト出荷日からの学習統計を再計算 ────────────────
 function computeBestStats() {
   const acc = {};
+  const yAcc = {};
   for (const o of orders) {
+    // 出荷率（播種数量→出荷数量）: 播種時の季節でキー化＋季節なしの予備キー
+    const sowQ = parseFloat(o.sowQtyActual), shipQ = parseFloat(o.shipQtyActual);
+    if (sowQ > 0 && shipQ >= 0 && shipQ <= sowQ * 1.5) {
+      const rate = shipQ / sowQ;
+      if (o.sowDate) {
+        const yk = statsKey(o.crop, o.type, getSeason(o.sowDate));
+        (yAcc[yk] = yAcc[yk] || []).push(rate);
+      }
+      const ykBase = statsKey(o.crop, o.type);
+      (yAcc[ykBase] = yAcc[ykBase] || []).push(rate);
+    }
     if (!o.bestShipDate || !o.sowDate) continue;
     const days = Math.round((parseLocalDate(o.bestShipDate) - parseLocalDate(o.sowDate)) / 86400000);
     if (days < 5 || days > 400) continue;
@@ -1792,6 +1817,16 @@ function computeBestStats() {
       min: Math.min(...d),
       max: Math.max(...d),
       count: d.length
+    };
+  }
+  yieldStats = {};
+  for (const k in yAcc) {
+    const r = yAcc[k];
+    yieldStats[k] = {
+      avg: r.reduce((a, b) => a + b, 0) / r.length,
+      min: Math.min(...r),
+      max: Math.max(...r),
+      count: r.length
     };
   }
 }
@@ -1852,6 +1887,22 @@ function calcSuggest(crop, type, delivery) {
     const g = Object.entries(GRAFT_DAYS).find(([k]) => crop.includes(k));
     if (g) graft = addDays(sow, g[1]);
   }
+
+  // 過去の出荷率（播種季節優先→季節なし）を参考表示
+  const ySeason = yieldStats[statsKey(crop, type, getSeason(sow))];
+  const yBase   = yieldStats[statsKey(crop, type)];
+  const y = (ySeason && ySeason.count >= 1) ? ySeason : yBase;
+  if (y && y.count >= 1) {
+    const avgPct = Math.round(y.avg * 100);
+    const minPct = Math.round(y.min * 100);
+    const maxPct = Math.round(y.max * 100);
+    note += `\n🌾 過去の出荷率：平均${avgPct}%`;
+    if (y.count >= 2) note += `（${minPct}〜${maxPct}%・${y.count}回）`;
+    if (avgPct > 0 && avgPct < 100) {
+      note += `\n　→ 必要数の約${(100 / avgPct).toFixed(2)}倍を播種するのが目安`;
+    }
+  }
+
   return { sow, graft, ship: delivery, note };
 }
 
@@ -2007,6 +2058,9 @@ function openOrderForm(order = null) {
   document.getElementById('f-graft').value    = order?.graftDate ?? '';
   document.getElementById('f-ship').value     = order?.shipDate ?? '';
   document.getElementById('f-best').value     = order?.bestShipDate ?? '';
+  document.getElementById('f-sow-qty').value  = order?.sowQtyActual ?? '';
+  document.getElementById('f-ship-qty').value = order?.shipQtyActual ?? '';
+  updateYieldDisplay();
   document.getElementById('f-pot').value      = order?.potDate ?? '';
   document.getElementById('f-memo').value     = order?.memo ?? '';
   document.getElementById('f-seed-ordered').checked = order?.seedOrdered ?? false;
@@ -2162,6 +2216,22 @@ document.getElementById('f-stock-seed-treat').addEventListener('change', functio
   document.getElementById('f-stock-seed-fields').style.display = this.checked ? '' : 'none';
 });
 
+// 播種数量・出荷数量から出荷率をリアルタイム表示
+function updateYieldDisplay() {
+  const sowQ  = parseFloat(document.getElementById('f-sow-qty').value);
+  const shipQ = parseFloat(document.getElementById('f-ship-qty').value);
+  const el = document.getElementById('f-yield-display');
+  if (sowQ > 0 && shipQ >= 0) {
+    const rate = Math.round(shipQ / sowQ * 100);
+    el.textContent = `🌾 出荷率：${rate}%（播種 ${sowQ} → 出荷 ${shipQ}）`;
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+}
+document.getElementById('f-sow-qty').addEventListener('input', updateYieldDisplay);
+document.getElementById('f-ship-qty').addEventListener('input', updateYieldDisplay);
+
 document.getElementById('btn-cal-add').onclick      = () => openOrderForm();
 document.getElementById('btn-order-add-h').onclick  = () => openOrderForm();
 document.getElementById('btn-order-add-f').onclick  = () => openOrderForm();
@@ -2202,6 +2272,8 @@ document.getElementById('btn-order-submit').onclick = async () => {
     graftDate: document.getElementById('f-graft').value,
     shipDate:  document.getElementById('f-ship').value,
     bestShipDate: document.getElementById('f-best').value,
+    sowQtyActual:  document.getElementById('f-sow-qty').value,
+    shipQtyActual: document.getElementById('f-ship-qty').value,
     potDate:   document.getElementById('f-pot').value,
     memo:        document.getElementById('f-memo').value,
     seedOrdered: document.getElementById('f-seed-ordered').checked,

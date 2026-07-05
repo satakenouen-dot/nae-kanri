@@ -3365,7 +3365,7 @@ document.getElementById('btn-sms-confirm').onclick = () => {
   const shipInfo = o.shipDate ? '出荷予定' + fmtJP(o.shipDate)
                  : (o.delivery ? '納品予定' + fmtJP(o.delivery) : '');
   const msg = '佐竹農園です。' +
-    (o.crop || '') + (o.variety ? '（' + o.variety + '）' : '') +
+    (o.variety || o.crop || '') + (o.type ? '（' + o.type + '）' : '') +
     '苗' + (o.qty ? o.qty : '') + '、承りました。' +
     (shipInfo ? shipInfo + '。' : '');
   window.location.href = buildSmsLink(o.phone, msg);
@@ -3448,7 +3448,7 @@ async function processPhotoUpload(file, stage, order, actualDate) {
 
     const dateLabel = fmtJP(actualDate || today());
     const msg = '佐竹農園です。' +
-      (order.crop || '') + (order.variety ? '（' + order.variety + '）' : '') +
+      (order.variety || order.crop || '') + (order.type ? '（' + order.type + '）' : '') +
       '苗、' + dateLabel + 'に' + stageLabel + '。写真→ ' + shortLink;
     document.body.removeChild(overlay);
     window.location.href = buildSmsLink(order.phone, msg);

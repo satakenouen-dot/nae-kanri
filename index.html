@@ -1938,9 +1938,10 @@ function renderCalendar() {
   };
 
   for (const o of orders) {
-    if (o.sowDate)   addEv(o.sowDate,   { type: '播種',  label: o.crop, id: o.id, order: o });
-    if (o.graftDate) addEv(o.graftDate, { type: '接ぎ木', label: o.crop, id: o.id, order: o });
-    addEv(o.shipDate || o.delivery,     { type: '出荷',  label: o.crop, id: o.id, order: o });
+    const lbl = o.variety || o.crop;   // 品種名を優先表示（未入力時は作物名）
+    if (o.sowDate)   addEv(o.sowDate,   { type: '播種',  label: lbl, id: o.id, order: o });
+    if (o.graftDate) addEv(o.graftDate, { type: '接ぎ木', label: lbl, id: o.id, order: o });
+    addEv(o.shipDate || o.delivery,     { type: '出荷',  label: lbl, id: o.id, order: o });
   }
   for (const p of pestLogs) {
     addEv(p.date, { type: '農薬', label: p.pestName || '農薬', log: p });

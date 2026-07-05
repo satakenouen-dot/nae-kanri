@@ -211,6 +211,11 @@ body{
     <span class="month-title" id="month-title"></span>
     <button class="mnav-btn" id="btn-next">›</button>
   </div>
+  <!-- 種子未発注アラート -->
+  <div id="seed-alert" style="display:none;background:#FFF8E1;border-bottom:2px solid #F9A825;padding:8px 14px;cursor:pointer">
+    <div style="font-size:12px;font-weight:700;color:#E65100">🌱 種子未発注の品種</div>
+    <div id="seed-alert-list" style="font-size:12px;color:#6d4c00;line-height:1.6;margin-top:2px"></div>
+  </div>
   <!-- 起動時復元バナー -->
   <div id="gdrive-restore-banner" style="display:none;background:#E3F2FD;border-bottom:2px solid #1565C0;padding:10px 14px;align-items:center;gap:8px">
     <span style="font-size:20px;flex-shrink:0">☁️</span>
@@ -1928,6 +1933,23 @@ function renderCalendar() {
     grid.appendChild(wc);
   });
   const todayStr = today();
+
+  // 種子未発注アラート（未播種・未出荷の注文が対象）
+  const unprepared = orders.filter(o =>
+    !o.seedOrdered &&
+    !(o.shipDate && o.shipDate <= todayStr) &&
+    !(o.sowDate && o.sowDate <= todayStr)
+  );
+  const seedAlert = document.getElementById('seed-alert');
+  if (unprepared.length) {
+    const names = [...new Set(unprepared.map(o => o.variety || o.crop).filter(Boolean))];
+    document.getElementById('seed-alert-list').textContent = names.join('、');
+    seedAlert.style.display = '';
+    seedAlert.onclick = () => showTab('orders');
+  } else {
+    seedAlert.style.display = 'none';
+  }
+
   const firstDow = (new Date(viewYear, viewMonth - 1, 1).getDay() + 6) % 7;
   const lastDay  = new Date(viewYear, viewMonth, 0).getDate();
 

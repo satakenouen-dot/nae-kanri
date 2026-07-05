@@ -3361,13 +3361,12 @@ document.getElementById('btn-sms-confirm').onclick = () => {
   const o = getCurrentOrder();
   if (!o) { alert('注文を保存してからご利用ください'); return; }
   if (!o.phone) { alert('携帯電話番号が入力されていません'); return; }
-  const orderDate = getActualDateValue();
   // SMSは70文字以内で確実に届くよう要点のみの短文にする
   const shipInfo = o.shipDate ? '出荷予定' + fmtJP(o.shipDate)
                  : (o.delivery ? '納品予定' + fmtJP(o.delivery) : '');
   const msg = '佐竹農園です。' +
-    (o.crop || '') + '苗' + (o.qty ? o.qty : '') + '、' +
-    fmtJP(orderDate) + '付で承りました。' +
+    (o.crop || '') + (o.variety ? '（' + o.variety + '）' : '') +
+    '苗' + (o.qty ? o.qty : '') + '、承りました。' +
     (shipInfo ? shipInfo + '。' : '');
   window.location.href = buildSmsLink(o.phone, msg);
 };
@@ -3449,7 +3448,8 @@ async function processPhotoUpload(file, stage, order, actualDate) {
 
     const dateLabel = fmtJP(actualDate || today());
     const msg = '佐竹農園です。' +
-      (order.crop || '') + '苗、' + dateLabel + 'に' + stageLabel + '。写真→ ' + shortLink;
+      (order.crop || '') + (order.variety ? '（' + order.variety + '）' : '') +
+      '苗、' + dateLabel + 'に' + stageLabel + '。写真→ ' + shortLink;
     document.body.removeChild(overlay);
     window.location.href = buildSmsLink(order.phone, msg);
   } catch(e) {

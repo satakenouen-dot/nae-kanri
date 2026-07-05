@@ -49,10 +49,9 @@ body{
 .mnav-btn{background:none;border:none;font-size:22px;cursor:pointer;color:var(--green);padding:4px 10px;border-radius:8px}
 .mnav-btn:active{background:var(--green-l)}
 .month-title{font-size:17px;font-weight:600}
-.weekdays{display:grid;grid-template-columns:repeat(7,1fr);background:#fff;border-bottom:1px solid var(--border)}
-.weekday{text-align:center;padding:6px 0;font-size:11px;font-weight:600;color:var(--text2)}
-.weekday:nth-child(6){color:var(--blue)}.weekday:nth-child(7){color:var(--red)}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border)}
+.weekday-cell{background:#fff;text-align:center;padding:6px 0;font-size:11px;font-weight:600;color:var(--text2)}
+.weekday-cell.sat{color:var(--blue)}.weekday-cell.sun{color:var(--red)}
 .cal-cell{background:var(--card);min-height:68px;padding:4px 3px;display:flex;flex-direction:column;gap:2px;cursor:pointer}
 .cal-cell:active{background:#f5f5f5}
 .cal-cell.empty{background:var(--bg);cursor:default;pointer-events:none}
@@ -223,11 +222,6 @@ body{
     <button id="btn-restore-banner-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#777;padding:4px;flex-shrink:0">✕</button>
   </div>
   <div style="flex:1;overflow-y:auto;padding-bottom:8px">
-    <!-- 曜日行：日付グリッドと一緒にスクロール -->
-    <div class="weekdays">
-      <div class="weekday">月</div><div class="weekday">火</div><div class="weekday">水</div>
-      <div class="weekday">木</div><div class="weekday">金</div><div class="weekday">土</div><div class="weekday">日</div>
-    </div>
     <div class="cal-grid" id="cal-grid"></div>
     <div class="legend">
       <div class="leg-item"><div class="leg-dot" style="background:var(--blue-l);border-color:var(--blue)"></div>播種</div>
@@ -1925,6 +1919,14 @@ function renderCalendar() {
   document.getElementById('month-title').textContent = `${viewYear}年 ${viewMonth}月`;
   const grid     = document.getElementById('cal-grid');
   grid.innerHTML = '';
+
+  // 曜日行を日付と同じグリッドの1行目として描画（列幅が完全に一致しズレない）
+  ['月','火','水','木','金','土','日'].forEach((w, i) => {
+    const wc = document.createElement('div');
+    wc.className = 'weekday-cell' + (i === 5 ? ' sat' : i === 6 ? ' sun' : '');
+    wc.textContent = w;
+    grid.appendChild(wc);
+  });
   const todayStr = today();
   const firstDow = (new Date(viewYear, viewMonth - 1, 1).getDay() + 6) % 7;
   const lastDay  = new Date(viewYear, viewMonth, 0).getDate();

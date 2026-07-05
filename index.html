@@ -3327,6 +3327,28 @@ function buildSmsLink(phone, message) {
   return 'sms:' + num + '?body=' + encodeURIComponent(message);
 }
 
+// 長いURLをis.gdで約20文字に短縮（JSONP方式・失敗時は元のURLを返す）
+function shortenUrl(longUrl) {
+  return new Promise((resolve) => {
+    const cb = 'isgd_cb_' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => { cleanup(); resolve(longUrl); }, 6000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cb] = (data) => {
+      cleanup();
+      resolve((data && data.shorturl) ? data.shorturl : longUrl);
+    };
+    script.onerror = () => { cleanup(); resolve(longUrl); };
+    script.src = 'https://is.gd/create.php?format=json&url=' +
+                 encodeURIComponent(longUrl) + '&callback=' + cb;
+    document.body.appendChild(script);
+  });
+}
+
 function getCurrentOrder() {
   return orders.find(o => o.id === editingOrderId);
 }
@@ -3340,20 +3362,14 @@ document.getElementById('btn-sms-confirm').onclick = () => {
   if (!o) { alert('注文を保存してからご利用ください'); return; }
   if (!o.phone) { alert('携帯電話番号が入力されていません'); return; }
   const orderDate = getActualDateValue();
-  const lines = [
-    'いつもお世話になっております。佐竹農園です。',
-    fmtJP(orderDate) + ' 付けでご注文を承りました。',
-    '',
-    '【ご注文内容】',
-    '品目: ' + (o.crop || '') + (o.variety ? '（' + o.variety + '）' : ''),
-    o.type ? '苗規格: ' + o.type : '',
-    o.qty  ? '数量: ' + o.qty : '',
-    o.sowDate    ? '播種予定: '   + fmtJP(o.sowDate)   : '',
-    o.shipDate   ? '出荷予定日: ' + fmtJP(o.shipDate)  : (o.delivery ? '納品予定日: ' + fmtJP(o.delivery) : ''),
-    '',
-    'よろしくお願いいたします。'
-  ].filter(Boolean);
-  window.location.href = buildSmsLink(o.phone, lines.join('\n'));
+  // SMSは70文字以内で確実に届くよう要点のみの短文にする
+  const shipInfo = o.shipDate ? '出荷予定' + fmtJP(o.shipDate)
+                 : (o.delivery ? '納品予定' + fmtJP(o.delivery) : '');
+  const msg = '佐竹農園です。' +
+    (o.crop || '') + '苗' + (o.qty ? o.qty : '') + '、' +
+    fmtJP(orderDate) + '付で承りました。' +
+    (shipInfo ? shipInfo + '。' : '');
+  window.location.href = buildSmsLink(o.phone, msg);
 };
 
 // 写真アップロード → SMSリンク送信
@@ -3427,22 +3443,15 @@ async function processPhotoUpload(file, stage, order, actualDate) {
       }
     }
 
+    // 長いドライブURLを短縮（約20文字）してSMSを70文字以内に収める
+    overlay.innerHTML = '<div style="font-size:40px">🔗</div><div style="margin-top:10px">リンクを短縮中...</div>';
+    const shortLink = await shortenUrl(link);
+
     const dateLabel = fmtJP(actualDate || today());
-    const lines = [
-      'いつもお世話になっております。佐竹農園です。',
-      '',
-      '【' + stageLabel + 'のご報告】',
-      '品目: ' + (order.crop || '') + (order.variety ? '（' + order.variety + '）' : ''),
-      order.qty ? '数量: ' + order.qty : '',
-      dateLabel + ' に ' + stageLabel + ' いたしました。',
-      '',
-      '写真はこちらでご確認いただけます:',
-      link,
-      '',
-      'よろしくお願いいたします。'
-    ].filter(Boolean);
+    const msg = '佐竹農園です。' +
+      (order.crop || '') + '苗、' + dateLabel + 'に' + stageLabel + '。写真→ ' + shortLink;
     document.body.removeChild(overlay);
-    window.location.href = buildSmsLink(order.phone, lines.join('\n'));
+    window.location.href = buildSmsLink(order.phone, msg);
   } catch(e) {
     if (document.body.contains(overlay)) document.body.removeChild(overlay);
     alert('処理に失敗しました: ' + e.message);

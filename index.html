@@ -63,6 +63,7 @@ body{
 .ev-tag{font-size:8px;padding:1px 3px;border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;line-height:1.5;border-left:2px solid}
 .ev-tag.播種{background:var(--blue-l);color:var(--blue);border-color:var(--blue)}
 .ev-tag.接ぎ木{background:var(--orange-l);color:var(--orange);border-color:var(--orange)}
+.ev-tag.定植{background:var(--orange-l);color:var(--orange);border-color:var(--orange)}
 .ev-tag.出荷{background:var(--red-l);color:var(--red);border-color:var(--red)}
 .ev-tag.農薬{background:var(--purple-l);color:var(--purple);border-color:var(--purple)}
 .ev-tag.ベスト{background:#FFF8E1;color:#F57F17;border-color:#F9A825}
@@ -135,6 +136,8 @@ body{
 .ev-card{border-radius:10px;padding:12px;margin-bottom:8px;border-left:4px solid}
 .ev-card.播種{background:var(--blue-l);border-color:var(--blue)}
 .ev-card.接ぎ木{background:var(--orange-l);border-color:var(--orange)}
+.ev-card.定植{background:var(--orange-l);border-color:var(--orange)}
+.ev-card.定植 .ev-card-type{color:var(--orange)}
 .ev-card.出荷{background:var(--red-l);border-color:var(--red)}
 .ev-card.農薬{background:var(--purple-l);border-color:var(--purple)}
 .ev-card.ベスト{background:#FFF8E1;border-color:#F9A825}
@@ -230,7 +233,7 @@ body{
     <div class="cal-grid" id="cal-grid"></div>
     <div class="legend">
       <div class="leg-item"><div class="leg-dot" style="background:var(--blue-l);border-color:var(--blue)"></div>播種</div>
-      <div class="leg-item"><div class="leg-dot" style="background:var(--orange-l);border-color:var(--orange)"></div>接ぎ木</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--orange-l);border-color:var(--orange)"></div>接ぎ木・定植</div>
       <div class="leg-item"><div class="leg-dot" style="background:var(--red-l);border-color:var(--red)"></div>出荷</div>
       <div class="leg-item"><div class="leg-dot" style="background:var(--purple-l);border-color:var(--purple)"></div>農薬</div>
     </div>
@@ -353,7 +356,7 @@ body{
         <input class="form-input" id="f-sow" type="date">
       </div>
       <div class="form-group">
-        <label class="form-label">接ぎ木日（確定）</label>
+        <label class="form-label" id="f-graft-label">接ぎ木日（確定）</label>
         <input class="form-input" id="f-graft" type="date">
       </div>
       <div class="form-group">
@@ -1444,7 +1447,7 @@ async function doGcalSync() {
     for (const o of orders) {
       const fields = [
         { key: 'sow',   label: '播種',   date: o.sowDate,   icon: '🌱' },
-        { key: 'graft', label: '接ぎ木', date: o.graftDate, icon: '🪡' },
+        { key: 'graft', label: isGraft(o.type) ? '接ぎ木' : '定植', date: o.graftDate, icon: isGraft(o.type) ? '🪡' : '🌿' },
         { key: 'pot',   label: '鉢上げ', date: o.potDate,   icon: '🪴' },
         { key: 'ship',  label: '出荷',   date: o.shipDate || o.delivery, icon: '📦' }
       ];
@@ -1531,7 +1534,7 @@ async function autoSyncOrderToGcal(o) {
   if (!gcalReminderCfg.enabled || !gcalAccessToken || !o) return;
   const fields = [
     { key: 'sow',   label: '播種',   date: o.sowDate,   icon: '🌱' },
-    { key: 'graft', label: '接ぎ木', date: o.graftDate, icon: '🪡' },
+    { key: 'graft', label: isGraft(o.type) ? '接ぎ木' : '定植', date: o.graftDate, icon: isGraft(o.type) ? '🪡' : '🌿' },
     { key: 'pot',   label: '鉢上げ', date: o.potDate,   icon: '🪴' },
     { key: 'ship',  label: '出荷',   date: o.shipDate || o.delivery, icon: '📦' }
   ];
@@ -1965,7 +1968,7 @@ function renderCalendar() {
   for (const o of orders) {
     const lbl = o.variety || o.crop;   // 品種名を優先表示（未入力時は作物名）
     if (o.sowDate)   addEv(o.sowDate,   { type: '播種',  label: lbl, id: o.id, order: o });
-    if (o.graftDate) addEv(o.graftDate, { type: '接ぎ木', label: lbl, id: o.id, order: o });
+    if (o.graftDate) addEv(o.graftDate, { type: isGraft(o.type) ? '接ぎ木' : '定植', label: lbl, id: o.id, order: o });
     addEv(o.shipDate || o.delivery,     { type: '出荷',  label: lbl, id: o.id, order: o });
   }
   for (const p of pestLogs) {
@@ -2068,6 +2071,7 @@ function openOrderForm(order = null) {
   const _graft = isGraft(_type);
   document.getElementById('variety-row-single').style.display = _graft ? 'none' : '';
   document.getElementById('variety-row-graft').style.display  = _graft ? '' : 'none';
+  document.getElementById('f-graft-label').textContent = _graft ? '接ぎ木日（確定）' : '定植日';
   if (_graft) {
     document.getElementById('f-variety-scion').value = order?.varietyScion ?? (_legacy[0] ?? '').trim();
     document.getElementById('f-variety-stock').value = order?.varietyStock ?? (_legacy[1] ?? '').trim();
@@ -2222,13 +2226,14 @@ function renderVarietySuggests() {
 }
 document.getElementById('f-crop').addEventListener('change', renderVarietySuggests);
 
-// 規格変更で品種欄・種子消毒欄を切り替え
+// 規格変更で品種欄・種子消毒欄・接ぎ木/定植ラベルを切り替え
 function updateVarietyFields() {
   const graft = isGraft(document.getElementById('f-type').value);
   document.getElementById('variety-row-single').style.display    = graft ? 'none' : '';
   document.getElementById('variety-row-graft').style.display     = graft ? '' : 'none';
   document.getElementById('f-seed-single-block').style.display   = graft ? 'none' : '';
   document.getElementById('f-seed-graft-block').style.display    = graft ? '' : 'none';
+  document.getElementById('f-graft-label').textContent = graft ? '接ぎ木日（確定）' : '定植日';
 }
 
 // 種子消毒チェック ON/OFF で成分欄を表示切り替え
@@ -3292,7 +3297,7 @@ function printPestHistory() {
 
 <div class="dates">
   <span><span class="dl">播種日：</span>${fmtPrint(order.sowDate)}</span>
-  <span><span class="dl">接ぎ木日：</span>${fmtPrint(order.graftDate)}</span>
+  <span><span class="dl">${isGraft(order.type) ? '接ぎ木日' : '定植日'}：</span>${fmtPrint(order.graftDate)}</span>
   <span><span class="dl">鉢上げ日：</span>${fmtPrint(order.potDate)}</span>
 </div>
 

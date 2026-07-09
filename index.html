@@ -195,6 +195,9 @@ body{
   <button class="bnav-item" data-tab="orders">
     <span class="bnav-icon">📋</span><span>注文</span>
   </button>
+  <button class="bnav-item" id="btn-exit-app" style="color:var(--red)">
+    <span class="bnav-icon">⏻</span><span>終了</span>
+  </button>
   <button class="bnav-item" data-tab="pesticide">
     <span class="bnav-icon">🌿</span><span>農薬</span>
   </button>
@@ -1033,7 +1036,15 @@ document.getElementById('btn-export-excel').onclick = () => {
     const wb = XLSX.utils.book_new();
 
     // ── 注文シート ──
-    const orderRows = orders.map(o => ({
+    // 播種が済んでいない注文を先頭に（播種日の早い順）、播種済みは後ろへ
+    const _today = today();
+    const sortedOrders = [...orders].sort((a, b) => {
+      const aDone = (a.sowDate && a.sowDate <= _today) ? 1 : 0;
+      const bDone = (b.sowDate && b.sowDate <= _today) ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return (a.sowDate || a.delivery || '9999').localeCompare(b.sowDate || b.delivery || '9999');
+    });
+    const orderRows = sortedOrders.map(o => ({
       '注文入力日': o.orderDate || '',
       '注文主': o.customer || '',
       '品目': o.crop || '',
@@ -1115,6 +1126,7 @@ function initGdrive() {
         gdriveAccessToken = resp.access_token;
         if (gdrivePendingAction === 'backup') doGdriveBackup();
         else if (gdrivePendingAction === 'restore') doGdriveRestore();
+        else if (gdrivePendingAction === 'exitBackup') doExitBackup();
         else if (gdrivePendingAction === 'photo' && pendingPhotoCtx) {
           const ctx = pendingPhotoCtx;
           pendingPhotoCtx = null;
@@ -1290,6 +1302,63 @@ function showGdriveRestoreBanner() {
     lsSet('nae-last-restore-check', Date.now()); // スキップしても1時間は出さない
   };
 }
+
+// ── 終了ボタン：バックアップしてアプリを閉じる ──────────
+async function doExitBackup() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;font-size:15px;text-align:center';
+  overlay.innerHTML = '<div style="font-size:44px">☁️</div><div style="margin-top:12px">バックアップ中...</div>';
+  document.body.appendChild(overlay);
+  try {
+    const fileName = 'nae-backup_' + jstStamp(true) + '.json';
+    const payload = JSON.stringify({ orders, pestLogs, pestMaster, varietyMaster, leadStats });
+    const boundary = 'bexit' + Date.now();
+    const meta = JSON.stringify({ name: fileName, mimeType: 'application/json' });
+    const body = '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + meta +
+                 '\r\n--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + payload +
+                 '\r\n--' + boundary + '--';
+    const res = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      { method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + gdriveAccessToken,
+          'Content-Type': 'multipart/related; boundary=' + boundary
+        },
+        body
+      });
+    if (res.status === 401 || res.status === 403) {
+      document.body.removeChild(overlay);
+      gdriveAccessToken = null;
+      gdrivePendingAction = 'exitBackup';
+      gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+      return;
+    }
+    if (!res.ok) throw new Error('API ' + res.status);
+    autoBackupDone = true;   // 二重バックアップを防止
+    overlay.innerHTML = '<div style="font-size:44px">✅</div><div style="margin-top:12px">バックアップ完了</div><div style="margin-top:6px;font-size:12px;opacity:.8">アプリを終了します...</div>';
+    setTimeout(() => {
+      window.close();
+      // window.close()が効かない環境向けの案内
+      setTimeout(() => {
+        overlay.innerHTML = '<div style="font-size:44px">✅</div><div style="margin-top:12px">バックアップ完了</div><div style="margin-top:8px;font-size:13px">このままアプリ（タブ）を閉じてください</div>';
+      }, 600);
+    }, 900);
+  } catch(e) {
+    document.body.removeChild(overlay);
+    alert('バックアップ失敗: ' + e.message + '\nアプリは終了しません。');
+  }
+}
+
+document.getElementById('btn-exit-app').onclick = () => {
+  if (!confirm('Googleドライブにバックアップしてアプリを終了しますか？')) return;
+  if (!gdriveAccessToken) {
+    if (!gdriveTokenClient) { alert('Google APIの初期化中です。少し待ってから再度お試しください。'); return; }
+    gdrivePendingAction = 'exitBackup';
+    gdriveTokenClient.requestAccessToken();
+    return;
+  }
+  doExitBackup();
+};
 
 // ページ非表示・終了時に自動バックアップ
 let autoBackupDone = false;
@@ -3533,7 +3602,7 @@ document.getElementById('btn-photo-ship').onclick  = () => {
 };
 
 // ── ボトムナビ ────────────────────────────────────────
-document.querySelectorAll('.bnav-item').forEach(btn =>
+document.querySelectorAll('.bnav-item[data-tab]').forEach(btn =>
   btn.onclick = () => showTab(btn.dataset.tab));
 </script>
 </body>

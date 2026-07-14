@@ -1104,6 +1104,7 @@ document.getElementById('btn-export-excel').onclick = () => {
 
 // ── Googleドライブ バックアップ ────────────────────────
 const GOAUTH_CLIENT_ID = '458669780454-d0tgla22aah22n5k3eko9vfblc5v06tm.apps.googleusercontent.com';
+const GOAUTH_LOGIN_HINT = 'satakenouen@gmail.com';   // アカウント選択をスキップ
 const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 let gdriveTokenClient = null;
 let gdriveAccessToken = null;
@@ -1118,6 +1119,8 @@ function initGdrive() {
     gdriveTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GOAUTH_CLIENT_ID,
       scope: GDRIVE_SCOPE,
+      login_hint: GOAUTH_LOGIN_HINT,
+      prompt: '',
       callback: (resp) => {
         if (resp.error) {
           alert('認証エラー: ' + resp.error);
@@ -1202,7 +1205,7 @@ async function doGdriveBackup() {
       if (labelEl) labelEl.textContent = 'Googleドライブにバックアップ';
       btn.disabled = false;
       gdrivePendingAction = 'backup';
-      gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+      gdriveTokenClient.requestAccessToken();
       return;
     }
     if (!res.ok) throw new Error('API ' + res.status + ': ' + await res.text());
@@ -1225,7 +1228,7 @@ async function doGdriveRestore() {
     if (listRes.status === 401 || listRes.status === 403) {
       gdriveAccessToken = null;
       gdrivePendingAction = 'restore';
-      gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+      gdriveTokenClient.requestAccessToken();
       return;
     }
     if (!listRes.ok) throw new Error('API ' + listRes.status + ': ' + await listRes.text());
@@ -1330,7 +1333,7 @@ async function doExitBackup() {
       document.body.removeChild(overlay);
       gdriveAccessToken = null;
       gdrivePendingAction = 'exitBackup';
-      gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+      gdriveTokenClient.requestAccessToken();
       return;
     }
     if (!res.ok) throw new Error('API ' + res.status);
@@ -1431,6 +1434,8 @@ function initGcal() {
     gcalTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GOAUTH_CLIENT_ID,
       scope: GCAL_SCOPE,
+      login_hint: GOAUTH_LOGIN_HINT,
+      prompt: '',
       callback: (resp) => {
         if (resp.error) { alert('カレンダー認証エラー: ' + resp.error); return; }
         gcalAccessToken = resp.access_token;
@@ -1541,7 +1546,7 @@ async function doGcalSync() {
         } catch(e) {
           if (e.message === 'AUTH') {
             gcalAccessToken = null;
-            gcalTokenClient.requestAccessToken({ prompt: 'consent' });
+            gcalTokenClient.requestAccessToken();
             return;
           }
           errors++;
@@ -1573,7 +1578,7 @@ async function doGcalSync() {
       } catch(e) {
         if (e.message === 'AUTH') {
           gcalAccessToken = null;
-          gcalTokenClient.requestAccessToken({ prompt: 'consent' });
+          gcalTokenClient.requestAccessToken();
           return;
         }
         errors++;

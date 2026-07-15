@@ -123,6 +123,8 @@ body{
 .seed-done{background:#E8F5E9;color:#2E7D32;border-color:#2E7D32}
 .seed-todo{background:#FFF8E1;color:#E65100;border-color:#FFB300}
 .seed-done:active,.seed-todo:active{opacity:.7}
+.cust-chip{flex-shrink:0;font-size:12px;font-weight:600;padding:5px 12px;border-radius:16px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;white-space:nowrap}
+.cust-chip.active{background:var(--green);border-color:var(--green);color:#fff}
 .settings-item{display:flex;align-items:center;gap:12px;padding:15px 16px;background:#fff;border-bottom:1px solid var(--border);cursor:pointer;border:none;width:100%;text-align:left;font-family:inherit;font-size:14px}
 .settings-item:active{background:var(--bg)}
 .settings-icon{font-size:22px;width:36px;text-align:center}
@@ -253,6 +255,8 @@ body{
   <div class="search-bar">
     <input class="search-input" id="order-search" placeholder="品目・品種・注文主で検索…" type="search">
   </div>
+  <!-- 注文主別ピックアップ -->
+  <div id="customer-chips" style="display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch"></div>
   <div class="scroll-body" id="order-list-body">
     <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">注文がありません</div></div>
   </div>
@@ -2461,10 +2465,38 @@ document.getElementById('btn-order-submit').onclick = async () => {
 };
 
 // ── 注文一覧 ──────────────────────────────────────────
+let customerFilter = null;   // 注文主ピックアップの選択状態
+
+function renderCustomerChips() {
+  const box = document.getElementById('customer-chips');
+  const names = [...new Set(orders.map(o => (o.customer || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'ja'));
+  if (!names.length) { box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  box.innerHTML = '';
+  const all = document.createElement('button');
+  all.className = 'cust-chip' + (customerFilter === null ? ' active' : '');
+  all.textContent = '全て';
+  all.onclick = () => { customerFilter = null; renderOrderList(); };
+  box.appendChild(all);
+  names.forEach(n => {
+    const chip = document.createElement('button');
+    chip.className = 'cust-chip' + (customerFilter === n ? ' active' : '');
+    chip.textContent = n;
+    chip.onclick = () => {
+      customerFilter = (customerFilter === n) ? null : n;   // 再タップで解除
+      renderOrderList();
+    };
+    box.appendChild(chip);
+  });
+}
+
 function renderOrderList() {
   const q    = document.getElementById('order-search').value.toLowerCase();
   const body = document.getElementById('order-list-body');
   const todayStr = today();
+
+  renderCustomerChips();
 
   // 状態分類
   function orderStatus(o) {
@@ -2474,6 +2506,7 @@ function renderOrderList() {
   }
 
   const filtered = [...orders]
+    .filter(o => !customerFilter || (o.customer || '').trim() === customerFilter)
     .filter(o => !q || [o.crop, o.variety, o.customer].some(v => (v||'').toLowerCase().includes(q)));
 
   const pending  = filtered.filter(o => orderStatus(o) === 'pending') .sort((a,b)=>(a.sowDate||'9999').localeCompare(b.sowDate||'9999'));

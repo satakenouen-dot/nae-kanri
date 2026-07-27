@@ -250,7 +250,10 @@ body{
 <div class="screen" id="screen-orders">
   <div class="header">
     <h1>📋 注文一覧</h1>
-    <button class="hbtn" id="btn-order-add-h">＋</button>
+    <div style="display:flex;gap:2px">
+      <button class="hbtn" id="btn-print-orders-h" title="この一覧を印刷">🖨</button>
+      <button class="hbtn" id="btn-order-add-h">＋</button>
+    </div>
   </div>
   <div class="search-bar">
     <input class="search-input" id="order-search" placeholder="品目・品種・注文主で検索…" type="search">
@@ -629,9 +632,9 @@ body{
     </button>
     <input type="file" id="backup-file" accept=".json" style="display:none">
     <div class="settings-section-title">その他</div>
-    <button class="settings-item" onclick="window.print()">
+    <button class="settings-item" id="btn-print-orders">
       <span class="settings-icon">🖨️</span>
-      <span>印刷・PDF出力</span>
+      <span>注文一覧を印刷（A4横）</span>
       <span style="margin-left:auto;color:var(--text2)">›</span>
     </button>
   </div>
@@ -3486,6 +3489,104 @@ function printPestHistory() {
 }
 
 document.getElementById('btn-print-hist').onclick = printPestHistory;
+
+// ── 注文一覧 印刷（A4横・1行1注文・罫線付き）────────────
+function printOrderList() {
+  if (!orders.length) { alert('印刷する注文がありません'); return; }
+
+  // 画面と同じ絞り込み・並び順（未播種が先、播種日の早い順）
+  const _today = today();
+  const list = orders
+    .filter(o => !customerFilter || (o.customer || '').trim() === customerFilter)
+    .sort((a, b) => {
+      const aDone = (a.sowDate && a.sowDate <= _today) ? 1 : 0;
+      const bDone = (b.sowDate && b.sowDate <= _today) ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return (a.sowDate || a.delivery || '9999').localeCompare(b.sowDate || b.delivery || '9999');
+    });
+
+  if (!list.length) { alert('印刷する注文がありません'); return; }
+
+  const md = s => s ? fmtJP(s) : '';   // 「7月5日」形式で列を狭く保つ
+  const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+  const rows = list.map((o, i) => {
+    const sown = o.sowDate && o.sowDate <= _today;
+    return `<tr class="${sown ? '' : 'unsown'}">
+      <td class="c">${i + 1}</td>
+      <td>${esc(o.customer)}</td>
+      <td>${esc(o.crop)}</td>
+      <td>${esc(o.variety)}</td>
+      <td>${esc(o.type)}</td>
+      <td class="r">${esc(o.qty)}</td>
+      <td class="c">${md(o.sowDate)}</td>
+      <td class="c">${md(o.graftDate)}</td>
+      <td class="c">${md(o.potDate)}</td>
+      <td class="c">${md(o.shipDate)}</td>
+      <td class="c">${md(o.delivery)}</td>
+      <td class="c">${o.seedOrdered ? '済' : ''}</td>
+      <td>${esc(o.memo)}</td>
+    </tr>`;
+  }).join('');
+
+  const title = '注文一覧' + (customerFilter ? '（' + esc(customerFilter) + ' 様）' : '');
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Yu Gothic','Hiragino Sans','Noto Sans JP',sans-serif; margin: 0; color: #000; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+  h1 { font-size: 13pt; margin: 0; }
+  .sub { font-size: 8pt; color: #333; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td {
+    border: 1px solid #333;          /* 掛け線（全セル罫線） */
+    padding: 3px 4px; font-size: 8.5pt;
+    line-height: 1.35; word-break: break-all; vertical-align: middle;
+  }
+  th { background: #e0e0e0; text-align: center; font-size: 8pt; }
+  td.c { text-align: center; white-space: nowrap; }
+  td.r { text-align: right; white-space: nowrap; }
+  tr { page-break-inside: avoid; }   /* 1注文が2ページに割れないように */
+  thead { display: table-header-group; }  /* 各ページに見出しを繰り返す */
+  tr.unsown td { background: #f2f8ff; }   /* 未播種は薄く色付け */
+  .foot { margin-top: 5px; font-size: 8pt; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="head">
+  <h1>${title}</h1>
+  <div class="sub">印刷日：${fmtPrint(_today)}　全${list.length}件（■薄青 = 未播種）</div>
+</div>
+<table>
+  <colgroup>
+    <col style="width:3.5%"><col style="width:10%"><col style="width:6.5%"><col style="width:15%">
+    <col style="width:8%"><col style="width:6%"><col style="width:7.5%"><col style="width:7.5%">
+    <col style="width:7.5%"><col style="width:7.5%"><col style="width:7.5%"><col style="width:3.5%">
+    <col style="width:10%">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>No</th><th>注文主</th><th>品目</th><th>品種</th><th>苗規格</th><th>数量</th>
+      <th>播種日</th><th>接木/定植</th><th>鉢上げ</th><th>出荷日</th><th>納期</th><th>種子</th><th>メモ</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="foot">
+  <span>有限会社 佐竹農園</span>
+  <span>TEL 073-460-4832　生産者直通 090-4767-0856</span>
+</div>
+<script>window.onload = () => { window.print(); }<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1100,height=800');
+  win.document.write(html);
+  win.document.close();
+}
+document.getElementById('btn-print-orders').onclick   = printOrderList;
+document.getElementById('btn-print-orders-h').onclick = printOrderList;
 
 // ── 顧客向けSMS連絡 & 写真付き完了報告 ────────────────────
 function buildSmsLink(phone, message) {

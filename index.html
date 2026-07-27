@@ -1031,6 +1031,28 @@ document.getElementById('btn-export-data').onclick = () => {
 };
 
 // ── Excel/OpenOffice形式エクスポート ────────────────
+// 列幅を内容に合わせて自動調整（全角文字は2文字分としてカウント）
+function autoFitCols(rows) {
+  if (!rows || !rows.length) return [];
+  const dispWidth = (v) => {
+    let w = 0;
+    for (const ch of String(v ?? '')) {
+      // 半角（ASCII・半角カナ）は1、全角（漢字・かな・全角記号）は2
+      w += /[\u0000-\u00ff\uff61-\uffdc\uffe8-\uffee]/.test(ch) ? 1 : 2;
+    }
+    return w;
+  };
+  return Object.keys(rows[0]).map(key => {
+    let max = dispWidth(key);
+    for (const r of rows) {
+      const w = dispWidth(r[key]);
+      if (w > max) max = w;
+    }
+    // 余白2文字分を足し、最小8・最大45文字幅に収める
+    return { wch: Math.min(Math.max(max + 2, 8), 45) };
+  });
+}
+
 document.getElementById('btn-export-excel').onclick = () => {
   if (typeof XLSX === 'undefined') {
     alert('Excel書き出し機能を読み込み中です。少し待ってから再度お試しください。');
@@ -1062,10 +1084,12 @@ document.getElementById('btn-export-excel').onclick = () => {
       '納期': o.delivery || '',
       'メモ': o.memo || ''
     }));
-    const wsOrders = XLSX.utils.json_to_sheet(orderRows.length ? orderRows : [{
+    const orderData = orderRows.length ? orderRows : [{
       '注文入力日':'','注文主':'','品目':'','品種':'','苗規格':'','数量':'',
       '播種日':'','接ぎ木日':'','鉢上げ日':'','出荷日':'','納期':'','メモ':''
-    }]);
+    }];
+    const wsOrders = XLSX.utils.json_to_sheet(orderData);
+    wsOrders['!cols'] = autoFitCols(orderData);
     XLSX.utils.book_append_sheet(wb, wsOrders, '注文');
 
     // ── 農薬散布シート ──
@@ -1081,9 +1105,11 @@ document.getElementById('btn-export-excel').onclick = () => {
         'メモ': p.memo || ''
       };
     });
-    const wsPest = XLSX.utils.json_to_sheet(pestRows.length ? pestRows : [{
+    const pestData = pestRows.length ? pestRows : [{
       '散布日':'','農薬名':'','成分名':'','希釈倍率':'','対象作物':'','メモ':''
-    }]);
+    }];
+    const wsPest = XLSX.utils.json_to_sheet(pestData);
+    wsPest['!cols'] = autoFitCols(pestData);
     XLSX.utils.book_append_sheet(wb, wsPest, '農薬散布');
 
     // ── 農薬マスターシート ──
@@ -1094,9 +1120,11 @@ document.getElementById('btn-export-excel').onclick = () => {
       '希釈倍率': m.dilution || '',
       'メモ': m.memo || ''
     }));
-    const wsMaster = XLSX.utils.json_to_sheet(masterRows.length ? masterRows : [{
+    const masterData = masterRows.length ? masterRows : [{
       '農薬名':'','成分名':'','種別':'','希釈倍率':'','メモ':''
-    }]);
+    }];
+    const wsMaster = XLSX.utils.json_to_sheet(masterData);
+    wsMaster['!cols'] = autoFitCols(masterData);
     XLSX.utils.book_append_sheet(wb, wsMaster, '農薬マスター');
 
     const fileName = 'nae-kanri-' + today() + '.xlsx';

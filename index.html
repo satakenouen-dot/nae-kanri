@@ -67,7 +67,7 @@ body{
 .ev-tag.出荷{background:var(--red-l);color:var(--red);border-color:var(--red)}
 .ev-tag.農薬{background:var(--purple-l);color:var(--purple);border-color:var(--purple)}
 .ev-tag.ベスト{background:#FFF8E1;color:#F57F17;border-color:#F9A825}
-.more-badge{font-size:8px;color:var(--text2);text-align:right;padding:0 2px}
+.more-badge{font-size:10px;font-weight:700;color:#fff;background:var(--green);border-radius:3px;text-align:center;padding:1px 2px;line-height:1.5;letter-spacing:-.3px}
 .legend{background:#fff;border-top:1px solid var(--border);padding:6px 12px;display:flex;gap:10px;flex-wrap:wrap}
 .leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)}
 .leg-dot{width:8px;height:8px;border-radius:2px;border-left:3px solid}
@@ -2136,7 +2136,7 @@ function renderCalendar() {
     if (evs.length > 3) {
       const more = document.createElement('div');
       more.className = 'more-badge';
-      more.textContent = `+${evs.length - 3}`;
+      more.textContent = `他${evs.length - 3}件`;
       cell.appendChild(more);
     }
     cell.onclick = () => openDayModal(d, evs, dateStr);

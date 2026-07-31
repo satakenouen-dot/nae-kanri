@@ -125,6 +125,14 @@ body{
 .seed-done:active,.seed-todo:active{opacity:.7}
 .cust-chip{flex-shrink:0;font-size:12px;font-weight:600;padding:5px 12px;border-radius:16px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;white-space:nowrap}
 .cust-chip.active{background:var(--green);border-color:var(--green);color:#fff}
+.status-tabs{display:flex;background:#fff;border-bottom:1px solid var(--border)}
+.status-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:9px 2px 7px;border:none;background:none;cursor:pointer;font-family:inherit;color:var(--text2);border-bottom:3px solid transparent}
+.status-tab .st-label{font-size:12px;font-weight:600;white-space:nowrap}
+.status-tab .st-count{font-size:15px;font-weight:700;line-height:1.1}
+.status-tab:active{background:#f5f5f5}
+.status-tab[data-status="pending"].active{color:#e65100;border-bottom-color:#f9a825;background:#fffde7}
+.status-tab[data-status="growing"].active{color:#2e7d32;border-bottom-color:#388e3c;background:#e8f5e9}
+.status-tab[data-status="shipped"].active{color:#555;border-bottom-color:#9e9e9e;background:#f5f5f5}
 .settings-item{display:flex;align-items:center;gap:12px;padding:15px 16px;background:#fff;border-bottom:1px solid var(--border);cursor:pointer;border:none;width:100%;text-align:left;font-family:inherit;font-size:14px}
 .settings-item:active{background:var(--bg)}
 .settings-icon{font-size:22px;width:36px;text-align:center}
@@ -257,6 +265,12 @@ body{
   </div>
   <div class="search-bar">
     <input class="search-input" id="order-search" placeholder="品目・品種・注文主で検索…" type="search">
+  </div>
+  <!-- 状態切替タブ -->
+  <div class="status-tabs">
+    <button class="status-tab active" data-status="pending"><span class="st-label">🌾 播種前</span><span class="st-count" id="cnt-pending">0</span></button>
+    <button class="status-tab" data-status="growing"><span class="st-label">🌱 在圃中</span><span class="st-count" id="cnt-growing">0</span></button>
+    <button class="status-tab" data-status="shipped"><span class="st-label">📦 出荷済み</span><span class="st-count" id="cnt-shipped">0</span></button>
   </div>
   <!-- 注文主別ピックアップ -->
   <div id="customer-chips" style="display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch"></div>
@@ -2496,7 +2510,8 @@ document.getElementById('btn-order-submit').onclick = async () => {
 };
 
 // ── 注文一覧 ──────────────────────────────────────────
-let customerFilter = null;   // 注文主ピックアップの選択状態
+let customerFilter = null;        // 注文主ピックアップの選択状態
+let statusFilter   = 'pending';   // 状態タブ（pending / growing / shipped）
 
 function renderCustomerChips() {
   const box = document.getElementById('customer-chips');
@@ -2544,10 +2559,13 @@ function renderOrderList() {
   const growing  = filtered.filter(o => orderStatus(o) === 'growing') .sort((a,b)=>(a.delivery||'').localeCompare(b.delivery||''));
   const shipped  = filtered.filter(o => orderStatus(o) === 'shipped') .sort((a,b)=>(b.shipDate||'').localeCompare(a.shipDate||''));
 
-  if (!filtered.length) {
-    body.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">注文がありません</div></div>';
-    return;
-  }
+  // タブの件数表示を更新
+  document.getElementById('cnt-pending').textContent = pending.length;
+  document.getElementById('cnt-growing').textContent = growing.length;
+  document.getElementById('cnt-shipped').textContent = shipped.length;
+  document.querySelectorAll('.status-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.status === statusFilter));
+
   body.innerHTML = '';
 
   // スタイル定義
@@ -2556,13 +2574,6 @@ function renderOrderList() {
     growing: { bg:'#e8f5e9', border:'#388e3c', iconBg:'#c8e6c9', icon:'🌱', label:'在圃中', labelColor:'#2e7d32' },
     shipped: { bg:'#f9f9f9', border:'#e0e0e0', iconBg:'#eeeeee', icon:'📦', label:'出荷済み', labelColor:'#757575' },
   };
-
-  function addSectionHeader(text, color) {
-    const h = document.createElement('div');
-    h.style.cssText = `padding:6px 16px 3px;font-size:11px;font-weight:bold;color:${color};background:#fff;border-bottom:1px solid #eee;letter-spacing:1px`;
-    h.textContent = text;
-    body.appendChild(h);
-  }
 
   function addItems(list, status) {
     const s = styles[status];
@@ -2596,11 +2607,26 @@ function renderOrderList() {
     });
   }
 
-  if (pending.length) { addSectionHeader('🌾 播種前', styles.pending.labelColor); addItems(pending, 'pending'); }
-  if (growing.length) { addSectionHeader('🌱 在圃中', styles.growing.labelColor); addItems(growing, 'growing'); }
-  if (shipped.length) { addSectionHeader('📦 出荷済み', styles.shipped.labelColor); addItems(shipped, 'shipped'); }
+  // 選択中のタブの注文だけを表示
+  const groups = { pending, growing, shipped };
+  const current = groups[statusFilter] || [];
+  if (current.length) {
+    addItems(current, statusFilter);
+  } else {
+    const s = styles[statusFilter];
+    body.innerHTML = `<div class="empty-state"><div class="empty-icon">${s.icon}</div><div class="empty-text">${s.label}の注文はありません</div></div>`;
+  }
 }
 document.getElementById('order-search').addEventListener('input', renderOrderList);
+
+// 状態切替タブ
+document.querySelectorAll('.status-tab').forEach(tab => {
+  tab.onclick = () => {
+    statusFilter = tab.dataset.status;
+    document.getElementById('order-list-body').scrollTop = 0;
+    renderOrderList();
+  };
+});
 
 // ── 農薬自動紐づけ ────────────────────────────────────
 function getInProgressOrders(dateStr) {

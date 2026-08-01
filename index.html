@@ -3531,9 +3531,10 @@ document.getElementById('btn-print-hist').onclick = printPestHistory;
 function printOrderList() {
   if (!orders.length) { alert('印刷する注文がありません'); return; }
 
-  // 画面と同じ絞り込み・並び順（未播種が先、播種日の早い順）
+  // 出荷済みは除外（未出荷分のみ）。並び順は未播種が先、播種日の早い順
   const _today = today();
   const list = orders
+    .filter(o => !(o.shipDate && o.shipDate <= _today))
     .filter(o => !customerFilter || (o.customer || '').trim() === customerFilter)
     .sort((a, b) => {
       const aDone = (a.sowDate && a.sowDate <= _today) ? 1 : 0;
@@ -3542,7 +3543,7 @@ function printOrderList() {
       return (a.sowDate || a.delivery || '9999').localeCompare(b.sowDate || b.delivery || '9999');
     });
 
-  if (!list.length) { alert('印刷する注文がありません'); return; }
+  if (!list.length) { alert('未出荷の注文がありません'); return; }
 
   const md = s => s ? fmtJP(s) : '';   // 「7月5日」形式で列を狭く保つ
   const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -3566,7 +3567,7 @@ function printOrderList() {
     </tr>`;
   }).join('');
 
-  const title = '注文一覧' + (customerFilter ? '（' + esc(customerFilter) + ' 様）' : '');
+  const title = '注文一覧（未出荷分）' + (customerFilter ? '　' + esc(customerFilter) + ' 様' : '');
   const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>${title}</title>
 <style>
@@ -3595,7 +3596,7 @@ function printOrderList() {
 <body>
 <div class="head">
   <h1>${title}</h1>
-  <div class="sub">印刷日：${fmtPrint(_today)}　全${list.length}件（■薄青 = 未播種）</div>
+  <div class="sub">印刷日：${fmtPrint(_today)}　未出荷 ${list.length}件（■薄青 = 未播種）</div>
 </div>
 <table>
   <colgroup>

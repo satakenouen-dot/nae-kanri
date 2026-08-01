@@ -468,6 +468,7 @@ input[type=number]{-moz-appearance:textfield}
 
     <!-- 保存済み注文の操作（スクロール領域内に配置して入力欄を広く保つ） -->
     <div class="form-section" id="order-actions-section" style="display:none">
+      <button class="btn-secondary" id="btn-print-accept" style="width:100%;padding:12px;background:#E3F2FD;border:1px solid #1565C0;color:#1565C0;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px">📠 注文引受書を印刷（FAX用）</button>
       <button class="btn-secondary" id="btn-print-hist" style="display:none;width:100%;padding:12px;background:#f0f0f0;border:1px solid #ccc;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🖨 農薬使用履歴を印刷</button>
       <div id="order-sms-actions" style="display:none;margin-top:8px">
         <div style="font-size:11px;color:var(--text2);padding:6px 0 4px">📱 顧客への連絡（携帯番号宛にSMS）</div>
@@ -3623,6 +3624,112 @@ function printOrderList() {
 }
 document.getElementById('btn-print-orders').onclick   = printOrderList;
 document.getElementById('btn-print-orders-h').onclick = printOrderList;
+
+// ── 注文引受書 印刷（FAX用・A4縦）────────────────────
+function toReiwa(dateStr) {
+  const d = dateStr ? parseLocalDate(dateStr) : new Date();
+  const y = d.getFullYear() - 2018;
+  return `令和　${y === 1 ? '元' : y}年　${d.getMonth() + 1}月　${d.getDate()}日`;
+}
+
+function printOrderAcceptance() {
+  const o = getCurrentOrder();
+  if (!o) { alert('注文を保存してからご利用ください'); return; }
+
+  // 同じ注文主・同じ受注日の注文をまとめて1枚に記載
+  const cust = (o.customer || '').trim();
+  const rows = orders.filter(x =>
+    (x.customer || '').trim() === cust && (x.orderDate || '') === (o.orderDate || '')
+  );
+  const list = rows.length ? rows : [o];
+
+  const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const yen = v => (v === '' || v == null) ? '' : Number(v).toLocaleString('ja-JP') + '円';
+
+  const bodyRows = list.map(x => `<tr>
+      <td class="c">${x.orderDate ? fmtJP(x.orderDate) : ''}</td>
+      <td>${esc(x.crop)}</td>
+      <td>${esc(x.variety)}</td>
+      <td class="r">${yen(x.price)}</td>
+      <td class="c">${x.sowDate ? fmtJP(x.sowDate) : ''}</td>
+    </tr>`).join('');
+  // 記入欄として最低5行を確保
+  const blanks = Array.from({ length: Math.max(0, 5 - list.length) },
+    () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>').join('');
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>苗注文引受書</title>
+<style>
+  @page { size: A4 portrait; margin: 20mm 18mm 18mm 20mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Yu Mincho','MS Mincho','Hiragino Mincho ProN',serif; margin: 0; color: #000; font-size: 10.5pt; line-height: 1.7; }
+  h1 { font-size: 17pt; text-align: center; letter-spacing: 8px; margin: 0 0 6px; font-weight: 700; }
+  .date { text-align: right; margin-bottom: 10px; }
+  .to { margin-bottom: 10px; }
+  .to div { margin-bottom: 2px; }
+  .to .name { font-size: 12pt; }
+  .to .name strong { font-size: 13pt; border-bottom: 1px solid #000; padding: 0 24px 1px 8px; }
+  .lead { margin: 10px 0 6px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 12px; }
+  th, td { border: 1px solid #000; padding: 5px 6px; font-size: 10pt; height: 26px; vertical-align: middle; word-break: break-all; }
+  th { background: #eee; text-align: center; font-weight: 700; }
+  td.c { text-align: center; white-space: nowrap; }
+  td.r { text-align: right; white-space: nowrap; }
+  .terms-title { font-weight: 700; margin: 6px 0 3px; }
+  ol.terms { margin: 0 0 10px; padding-left: 1.6em; }
+  ol.terms li { font-size: 9.5pt; line-height: 1.65; margin-bottom: 1px; }
+  .company { text-align: right; font-size: 10pt; line-height: 1.8; margin-top: 14px; }
+  .company .nm { font-size: 11.5pt; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>苗注文引受書</h1>
+<div class="date">${toReiwa(today())}</div>
+
+<div class="to">
+  <div>住所（自宅・圃場）</div>
+  <div>　〒　　　　ー　　　　　　　</div>
+  <div class="name">氏名　<strong>${esc(cust) || '　　　　　　　　　　'}</strong>　様</div>
+  <div>TEL　　　　　　　　　　　　　　　FAX　　　　　　　　　　　　　　　</div>
+  <div>携帯　${esc(o.phone) || '　　　　　　　　　　'}</div>
+</div>
+
+<div class="lead">毎度有難う御座います。下記の通り御注文お引き受けいたします。</div>
+
+<table>
+  <colgroup>
+    <col style="width:16%"><col style="width:16%"><col style="width:34%"><col style="width:17%"><col style="width:17%">
+  </colgroup>
+  <thead>
+    <tr><th>受注日</th><th>品目</th><th>品種</th><th>単価（税別）</th><th>播種日</th></tr>
+  </thead>
+  <tbody>${bodyRows}${blanks}</tbody>
+</table>
+
+<div class="terms-title">苗の注文・納品・苗と責任について</div>
+<ol class="terms">
+  <li>ご注文は、FAXまたは書面でお願いいたします。</li>
+  <li>苗の返品、お取替えには応じかねます。</li>
+  <li>播種後の変更や、取り消しはできません。実費請求させていただきます。</li>
+  <li>育苗には最善の努力をいたしますが、気象条件やその他予測不能の事態により、納期、品種、本数、苗齢等に変更が生じる場合がございますので予め御了承ください。</li>
+  <li>また、その影響で収量や収益が左右されることも考えられますが、万一結果不良が生じても、お買い上げ代金の範囲内の補償を限度とさせていただきますので、御了承の上ご注文下さい。</li>
+</ol>
+
+<div class="company">
+  〒649-6314　　和歌山市　島　201<br>
+  <span class="nm">有限会社　佐竹農園　・　種苗と園芸NODOKA</span><br>
+  TEL 073-460-4832　　FAX 073-460-7569<br>
+  農場直通 090-4767-0856
+</div>
+
+<script>window.onload = () => { window.print(); }<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=820,height=1000');
+  win.document.write(html);
+  win.document.close();
+}
+document.getElementById('btn-print-accept').onclick = printOrderAcceptance;
 
 // ── 顧客向けSMS連絡 & 写真付き完了報告 ────────────────────
 function buildSmsLink(phone, message) {

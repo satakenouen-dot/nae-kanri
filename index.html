@@ -3636,10 +3636,16 @@ function printOrderAcceptance() {
   const o = getCurrentOrder();
   if (!o) { alert('注文を保存してからご利用ください'); return; }
 
-  // 同じ注文主・同じ受注日の注文をまとめて1枚に記載
+  // 同じ注文主の未出荷分をすべて記載（今回の注文は出荷済みでも必ず含める）
   const cust = (o.customer || '').trim();
-  const rows = orders.filter(x =>
-    (x.customer || '').trim() === cust && (x.orderDate || '') === (o.orderDate || '')
+  const _td = today();
+  const rows = orders.filter(x => {
+    if ((x.customer || '').trim() !== cust) return false;
+    if (x.id === o.id) return true;                       // 今開いている注文は必ず記載
+    return !(x.shipDate && x.shipDate <= _td);            // 未出荷のみ
+  }).sort((a, b) =>
+    (a.orderDate || '9999').localeCompare(b.orderDate || '9999') ||
+    (a.delivery  || '9999').localeCompare(b.delivery  || '9999')
   );
   const list = rows.length ? rows : [o];
 
@@ -3675,6 +3681,8 @@ function printOrderAcceptance() {
   table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 12px; }
   th, td { border: 1px solid #000; padding: 5px 4px; font-size: 9pt; height: 26px; vertical-align: middle; word-break: break-all; }
   th { background: #eee; text-align: center; font-weight: 700; }
+  tr { page-break-inside: avoid; }
+  thead { display: table-header-group; }
   td.c { text-align: center; white-space: nowrap; }
   td.r { text-align: right; white-space: nowrap; }
   .terms-title { font-weight: 700; margin: 6px 0 3px; }

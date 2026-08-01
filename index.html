@@ -3652,10 +3652,11 @@ function printOrderAcceptance() {
       <td>${esc(x.variety)}</td>
       <td class="r">${yen(x.price)}</td>
       <td class="c">${x.sowDate ? fmtJP(x.sowDate) : ''}</td>
+      <td class="c">${x.delivery ? fmtJP(x.delivery) : ''}</td>
     </tr>`).join('');
   // 記入欄として最低5行を確保
   const blanks = Array.from({ length: Math.max(0, 5 - list.length) },
-    () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>').join('');
+    () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>').join('');
 
   const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>苗注文引受書</title>
@@ -3678,7 +3679,11 @@ function printOrderAcceptance() {
   .terms-title { font-weight: 700; margin: 6px 0 3px; }
   ol.terms { margin: 0 0 10px; padding-left: 1.6em; }
   ol.terms li { font-size: 9.5pt; line-height: 1.65; margin-bottom: 1px; }
-  .company { text-align: right; font-size: 10pt; line-height: 1.8; margin-top: 14px; }
+  .bottom-row { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 12px; gap: 10px; }
+  .qr-wrap { display: flex; align-items: center; gap: 8px; }
+  .qr-img { width: 22mm; height: 22mm; display: block; flex-shrink: 0; }
+  .qr-text { font-size: 8.5pt; line-height: 1.55; }
+  .company { text-align: right; font-size: 10pt; line-height: 1.8; white-space: nowrap; }
   .company .nm { font-size: 11.5pt; font-weight: 700; }
 </style>
 </head>
@@ -3698,28 +3703,38 @@ function printOrderAcceptance() {
 
 <table>
   <colgroup>
-    <col style="width:16%"><col style="width:16%"><col style="width:34%"><col style="width:17%"><col style="width:17%">
+    <col style="width:12%"><col style="width:14%"><col style="width:35%"><col style="width:13%"><col style="width:12%"><col style="width:14%">
   </colgroup>
   <thead>
-    <tr><th>受注日</th><th>品目</th><th>品種</th><th>単価（税別）</th><th>播種日</th></tr>
+    <tr><th>受注日</th><th>品目</th><th>品種</th><th>単価(税別)</th><th>播種日</th><th>納品予定日</th></tr>
   </thead>
   <tbody>${bodyRows}${blanks}</tbody>
 </table>
 
 <div class="terms-title">苗の注文・納品・苗と責任について</div>
 <ol class="terms">
-  <li>ご注文は、FAXまたは書面でお願いいたします。</li>
+  <li>ご注文は、FAX・メール・書面、またはLINE友だち登録の上トークよりお願いいたします。</li>
   <li>苗の返品、お取替えには応じかねます。</li>
   <li>播種後の変更や、取り消しはできません。実費請求させていただきます。</li>
   <li>育苗には最善の努力をいたしますが、気象条件やその他予測不能の事態により、納期、品種、本数、苗齢等に変更が生じる場合がございますので予め御了承ください。</li>
   <li>また、その影響で収量や収益が左右されることも考えられますが、万一結果不良が生じても、お買い上げ代金の範囲内の補償を限度とさせていただきますので、御了承の上ご注文下さい。</li>
 </ol>
 
-<div class="company">
-  〒649-6314　　和歌山市　島　201<br>
-  <span class="nm">有限会社　佐竹農園　・　種苗と園芸NODOKA</span><br>
-  TEL 073-460-4832　　FAX 073-460-7569<br>
-  農場直通 090-4767-0856
+<div class="bottom-row">
+  <div class="qr-wrap">
+    <img class="qr-img" src="https://qr-official.line.me/gs/M_409jyppa_BW.png?oat_content=qr" alt="LINE QR">
+    <div class="qr-text">
+      <strong>LINEでのご注文はこちら</strong><br>
+      QRコードを読み取り友だち登録の上、<br>
+      トークよりご連絡ください。
+    </div>
+  </div>
+  <div class="company">
+    〒649-6314　　和歌山市　島　201<br>
+    <span class="nm">有限会社　佐竹農園　・　種苗と園芸NODOKA</span><br>
+    TEL 073-460-4832　　FAX 073-460-7569<br>
+    農場直通 090-4767-0856
+  </div>
 </div>
 
 <script>window.onload = () => { window.print(); }<\/script>

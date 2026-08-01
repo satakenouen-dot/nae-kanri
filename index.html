@@ -3650,13 +3650,14 @@ function printOrderAcceptance() {
       <td class="c">${x.orderDate ? fmtJP(x.orderDate) : ''}</td>
       <td>${esc(x.crop)}</td>
       <td>${esc(x.variety)}</td>
+      <td class="r">${esc(x.qty)}</td>
       <td class="r">${yen(x.price)}</td>
       <td class="c">${x.sowDate ? fmtJP(x.sowDate) : ''}</td>
       <td class="c">${x.delivery ? fmtJP(x.delivery) : ''}</td>
     </tr>`).join('');
   // 記入欄として最低5行を確保
   const blanks = Array.from({ length: Math.max(0, 5 - list.length) },
-    () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>').join('');
+    () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('');
 
   const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>苗注文引受書</title>
@@ -3672,7 +3673,7 @@ function printOrderAcceptance() {
   .to .name strong { font-size: 13pt; border-bottom: 1px solid #000; padding: 0 24px 1px 8px; }
   .lead { margin: 10px 0 6px; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 12px; }
-  th, td { border: 1px solid #000; padding: 5px 6px; font-size: 10pt; height: 26px; vertical-align: middle; word-break: break-all; }
+  th, td { border: 1px solid #000; padding: 5px 4px; font-size: 9pt; height: 26px; vertical-align: middle; word-break: break-all; }
   th { background: #eee; text-align: center; font-weight: 700; }
   td.c { text-align: center; white-space: nowrap; }
   td.r { text-align: right; white-space: nowrap; }
@@ -3703,10 +3704,10 @@ function printOrderAcceptance() {
 
 <table>
   <colgroup>
-    <col style="width:12%"><col style="width:14%"><col style="width:35%"><col style="width:13%"><col style="width:12%"><col style="width:14%">
+    <col style="width:10%"><col style="width:13%"><col style="width:31%"><col style="width:10%"><col style="width:12%"><col style="width:10%"><col style="width:14%">
   </colgroup>
   <thead>
-    <tr><th>受注日</th><th>品目</th><th>品種</th><th>単価(税別)</th><th>播種日</th><th>納品予定日</th></tr>
+    <tr><th>受注日</th><th>品目</th><th>品種</th><th>本数</th><th>単価(税別)</th><th>播種日</th><th>納品予定日</th></tr>
   </thead>
   <tbody>${bodyRows}${blanks}</tbody>
 </table>

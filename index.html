@@ -603,6 +603,14 @@ input[type=number]{-moz-appearance:textfield}
       <span>Googleドライブから復元</span>
       <span style="margin-left:auto;color:var(--text2)">›</span>
     </button>
+    <button class="settings-item" id="btn-gdrive-tidy">
+      <span class="settings-icon">🗂</span>
+      <span class="gdrive-tidy-label">古いバックアップを整理</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <div style="padding:6px 16px 10px;font-size:11px;color:var(--text2);line-height:1.6;background:#fff;border-bottom:1px solid var(--border)">
+      バックアップは「苗管理バックアップ」フォルダに1日1ファイルで保存され、直近30日分だけ残ります。古い分はゴミ箱へ移動するので30日間は復元できます。
+    </div>
     <div class="settings-section-title">Googleカレンダー通知</div>
     <div style="padding:8px 16px;background:var(--green-l);font-size:11px;color:var(--text2);line-height:1.6">
       播種日・接ぎ木日・出荷日などの予定をGoogleカレンダーに登録し、設定時刻にスマホへ通知します
@@ -1168,6 +1176,121 @@ let gdriveTokenClient = null;
 let gdriveAccessToken = null;
 let gdrivePendingAction = null; // 'backup' | 'restore'
 
+// ── バックアップの保管ルール ──────────────────────────
+const GDRIVE_FOLDER_NAME = '苗管理バックアップ';  // 専用フォルダ
+const GDRIVE_KEEP_DAYS   = 30;                    // 残す世代数（日数）
+let gdriveFolderId = null;
+
+function gdriveHeaders(extra) {
+  return Object.assign({ 'Authorization': 'Bearer ' + gdriveAccessToken }, extra || {});
+}
+
+// 専用フォルダを取得（無ければ作成）
+async function ensureBackupFolder() {
+  if (gdriveFolderId) return gdriveFolderId;
+  const q = encodeURIComponent(
+    `name='${GDRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const res = await fetch(
+    'https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id)&pageSize=1',
+    { headers: gdriveHeaders() });
+  if (res.status === 401 || res.status === 403) throw new Error('AUTH');
+  if (res.ok) {
+    const d = await res.json();
+    if (d.files && d.files.length) { gdriveFolderId = d.files[0].id; return gdriveFolderId; }
+  }
+  const mk = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: gdriveHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name: GDRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' })
+  });
+  if (!mk.ok) throw new Error('フォルダ作成失敗: ' + mk.status);
+  gdriveFolderId = (await mk.json()).id;
+  return gdriveFolderId;
+}
+
+// アプリが作ったバックアップを新しい順に取得
+async function listBackupFiles() {
+  const q = encodeURIComponent(
+    "name contains 'nae-backup' and mimeType!='application/vnd.google-apps.folder' and trashed=false");
+  const res = await fetch(
+    'https://www.googleapis.com/drive/v3/files?q=' + q +
+    '&orderBy=createdTime desc&fields=files(id,name,createdTime,parents)&pageSize=200',
+    { headers: gdriveHeaders() });
+  if (res.status === 401 || res.status === 403) throw new Error('AUTH');
+  if (!res.ok) throw new Error('API ' + res.status);
+  return (await res.json()).files || [];
+}
+
+// バックアップ本体を保存（同じ日のファイルがあれば上書き）
+async function saveBackupToDrive() {
+  const folderId = await ensureBackupFolder();
+  const json = JSON.stringify({
+    orders, pestLogs, pestMaster, varietyMaster, leadStats,
+    exportedAt: new Date().toISOString(), version: 1
+  }, null, 2);
+  const fileName = 'nae-backup_' + jstStamp(false).split('_')[0] + '.json';  // 1日1ファイル
+
+  const files = await listBackupFiles();
+  const same  = files.find(f => f.name === fileName);
+
+  if (same) {
+    // 同じ日のファイルを中身だけ差し替え（新規に増やさない）
+    const up = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files/' + same.id + '?uploadType=media',
+      { method: 'PATCH',
+        headers: gdriveHeaders({ 'Content-Type': 'application/json' }),
+        body: json });
+    if (up.status === 401 || up.status === 403) throw new Error('AUTH');
+    if (!up.ok) throw new Error('更新失敗: ' + up.status);
+  } else {
+    const boundary = 'naebound' + Date.now();
+    const metadata = { name: fileName, mimeType: 'application/json',
+      parents: [folderId], description: '苗生産管理アプリ - バックアップ' };
+    const body =
+      '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) + '\r\n' +
+      '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + json + '\r\n' +
+      '--' + boundary + '--';
+    const res = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      { method: 'POST',
+        headers: gdriveHeaders({ 'Content-Type': 'multipart/related; boundary=' + boundary }),
+        body });
+    if (res.status === 401 || res.status === 403) throw new Error('AUTH');
+    if (!res.ok) throw new Error('API ' + res.status + ': ' + await res.text());
+  }
+  return fileName;
+}
+
+// 古いバックアップを整理：専用フォルダへ集約し、直近30世代だけ残して残りはゴミ箱へ
+async function tidyBackups(keep) {
+  keep = keep || GDRIVE_KEEP_DAYS;
+  const folderId = await ensureBackupFolder();
+  const files = await listBackupFiles();   // 新しい順
+  let moved = 0, trashed = 0;
+
+  // ① フォルダ外にあるものをフォルダへ移動
+  for (const f of files) {
+    if ((f.parents || []).includes(folderId)) continue;
+    const prev = (f.parents || []).join(',');
+    const url = 'https://www.googleapis.com/drive/v3/files/' + f.id +
+                '?addParents=' + folderId + (prev ? '&removeParents=' + prev : '') + '&fields=id';
+    const r = await fetch(url, { method: 'PATCH', headers: gdriveHeaders({ 'Content-Type': 'application/json' }), body: '{}' });
+    if (r.ok) moved++;
+  }
+
+  // ② 直近 keep 件を残して、古いものはゴミ箱へ（完全削除はしない）
+  for (const f of files.slice(keep)) {
+    const r = await fetch('https://www.googleapis.com/drive/v3/files/' + f.id, {
+      method: 'PATCH',
+      headers: gdriveHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ trashed: true })
+    });
+    if (r.ok) trashed++;
+  }
+  return { total: files.length, moved, trashed, kept: Math.min(files.length, keep) };
+}
+
 function initGdrive() {
   if (!window.google?.accounts?.oauth2) {
     setTimeout(initGdrive, 500);
@@ -1188,6 +1311,7 @@ function initGdrive() {
         if (gdrivePendingAction === 'backup') doGdriveBackup();
         else if (gdrivePendingAction === 'restore') doGdriveRestore();
         else if (gdrivePendingAction === 'exitBackup') doExitBackup();
+        else if (gdrivePendingAction === 'tidy') doGdriveTidy();
         else if (gdrivePendingAction === 'photo' && pendingPhotoCtx) {
           const ctx = pendingPhotoCtx;
           pendingPhotoCtx = null;
@@ -1211,6 +1335,42 @@ document.getElementById('btn-gdrive-backup').onclick = () => {
   else gdriveTokenClient.requestAccessToken();
 };
 
+document.getElementById('btn-gdrive-tidy').onclick = () => {
+  if (!gdriveTokenClient) {
+    alert('Google APIの初期化中です。少し待ってから再度お試しください。');
+    return;
+  }
+  if (!confirm('Googleドライブのバックアップを整理します。\n\n・「' + GDRIVE_FOLDER_NAME + '」フォルダにまとめます\n・直近' + GDRIVE_KEEP_DAYS + '件を残し、古い分はゴミ箱へ移します\n\n※完全削除ではないので30日間は元に戻せます。')) return;
+  gdrivePendingAction = 'tidy';
+  if (gdriveAccessToken) doGdriveTidy();
+  else gdriveTokenClient.requestAccessToken();
+};
+
+async function doGdriveTidy() {
+  const btn = document.getElementById('btn-gdrive-tidy');
+  const labelEl = btn.querySelector('.gdrive-tidy-label');
+  btn.disabled = true;
+  if (labelEl) labelEl.textContent = '整理中...';
+  try {
+    const r = await tidyBackups();
+    alert('✅ 整理完了\n\n見つかったバックアップ：' + r.total + '件\n' +
+          '📁 フォルダへ移動：' + r.moved + '件\n' +
+          '🗑 ゴミ箱へ移動：' + r.trashed + '件\n' +
+          '✔ 残した件数：' + r.kept + '件');
+  } catch(e) {
+    if (e.message === 'AUTH') {
+      gdriveAccessToken = null;
+      gdrivePendingAction = 'tidy';
+      gdriveTokenClient.requestAccessToken();
+      return;
+    }
+    alert('整理に失敗しました: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    if (labelEl) labelEl.textContent = '古いバックアップを整理';
+  }
+}
+
 document.getElementById('btn-gdrive-restore').onclick = () => {
   if (!gdriveTokenClient) {
     alert('Google APIの初期化中です。少し待ってから再度お試しください。');
@@ -1227,38 +1387,16 @@ async function doGdriveBackup() {
   btn.disabled = true;
   if (labelEl) labelEl.textContent = 'バックアップ中...';
   try {
-    const data = {
-      orders, pestLogs, pestMaster, varietyMaster, leadStats,
-      exportedAt: new Date().toISOString(),
-      version: 1
-    };
-    const json = JSON.stringify(data, null, 2);
-
-    const fileName = 'nae-backup-' + jstStamp(false) + '.json';
-
-    const boundary = 'naebound' + Date.now();
-    const metadata = { name: fileName, mimeType: 'application/json',
-      description: '苗生産管理アプリ - 自動バックアップ' };
-    const body =
-      '--' + boundary + '\r\n' +
-      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-      JSON.stringify(metadata) + '\r\n' +
-      '--' + boundary + '\r\n' +
-      'Content-Type: application/json\r\n\r\n' +
-      json + '\r\n' +
-      '--' + boundary + '--';
-
-    const res = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-      { method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + gdriveAccessToken,
-          'Content-Type': 'multipart/related; boundary=' + boundary
-        },
-        body
-      });
-    if (res.status === 401 || res.status === 403) {
-      // トークン期限切れ or 権限不足 → 再認証
+    const fileName = await saveBackupToDrive();
+    if (labelEl) labelEl.textContent = '整理中...';
+    const r = await tidyBackups();
+    let msg = '✅ バックアップ成功\nファイル名: ' + fileName +
+              '\n\n保存先：Googleドライブの「' + GDRIVE_FOLDER_NAME + '」フォルダ';
+    if (r.moved)   msg += '\n\n📁 過去のバックアップ ' + r.moved + '件をフォルダへ移動しました。';
+    if (r.trashed) msg += '\n🗑 古いバックアップ ' + r.trashed + '件をゴミ箱へ移しました（直近' + GDRIVE_KEEP_DAYS + '件を保持）。';
+    alert(msg);
+  } catch(e) {
+    if (e.message === 'AUTH') {
       gdriveAccessToken = null;
       if (labelEl) labelEl.textContent = 'Googleドライブにバックアップ';
       btn.disabled = false;
@@ -1266,9 +1404,6 @@ async function doGdriveBackup() {
       gdriveTokenClient.requestAccessToken();
       return;
     }
-    if (!res.ok) throw new Error('API ' + res.status + ': ' + await res.text());
-    alert('✅ バックアップ成功\nファイル名: ' + fileName + '\n\nGoogleドライブの「マイドライブ」に保存されました。');
-  } catch(e) {
     alert('バックアップ失敗: ' + e.message);
   } finally {
     btn.disabled = false;
@@ -1371,30 +1506,9 @@ async function doExitBackup() {
   overlay.innerHTML = '<div style="font-size:44px">☁️</div><div style="margin-top:12px">バックアップ中...</div>';
   document.body.appendChild(overlay);
   try {
-    const fileName = 'nae-backup_' + jstStamp(true) + '.json';
-    const payload = JSON.stringify({ orders, pestLogs, pestMaster, varietyMaster, leadStats });
-    const boundary = 'bexit' + Date.now();
-    const meta = JSON.stringify({ name: fileName, mimeType: 'application/json' });
-    const body = '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + meta +
-                 '\r\n--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + payload +
-                 '\r\n--' + boundary + '--';
-    const res = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-      { method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + gdriveAccessToken,
-          'Content-Type': 'multipart/related; boundary=' + boundary
-        },
-        body
-      });
-    if (res.status === 401 || res.status === 403) {
-      document.body.removeChild(overlay);
-      gdriveAccessToken = null;
-      gdrivePendingAction = 'exitBackup';
-      gdriveTokenClient.requestAccessToken();
-      return;
-    }
-    if (!res.ok) throw new Error('API ' + res.status);
+    await saveBackupToDrive();
+    overlay.innerHTML = '<div style="font-size:44px">🗂</div><div style="margin-top:12px">古いバックアップを整理中...</div>';
+    await tidyBackups();
     autoBackupDone = true;   // 二重バックアップを防止
     overlay.innerHTML = '<div style="font-size:44px">✅</div><div style="margin-top:12px">バックアップ完了</div><div style="margin-top:6px;font-size:12px;opacity:.8">アプリを終了します...</div>';
     setTimeout(() => {
@@ -1406,6 +1520,12 @@ async function doExitBackup() {
     }, 900);
   } catch(e) {
     document.body.removeChild(overlay);
+    if (e.message === 'AUTH') {
+      gdriveAccessToken = null;
+      gdrivePendingAction = 'exitBackup';
+      gdriveTokenClient.requestAccessToken();
+      return;
+    }
     alert('バックアップ失敗: ' + e.message + '\nアプリは終了しません。');
   }
 }
@@ -1429,22 +1549,8 @@ async function autoBackupSilent() {
   if (orders.length === 0 && pestLogs.length === 0) return;
   autoBackupDone = true;
   try {
-    const fileName = 'nae-backup_' + jstStamp(true) + '.json';
-    const payload = JSON.stringify({ orders, pestLogs, pestMaster, varietyMaster, leadStats });
-    const boundary = 'bauto' + Date.now();
-    const meta = JSON.stringify({ name: fileName, mimeType: 'application/json' });
-    const body = '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + meta +
-                 '\r\n--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + payload +
-                 '\r\n--' + boundary + '--';
-    await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-      { method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + gdriveAccessToken,
-          'Content-Type': 'multipart/related; boundary=' + boundary
-        },
-        body
-      });
+    await saveBackupToDrive();
+    await tidyBackups();
   } catch(e) {
     // サイレント失敗
   }

@@ -183,6 +183,9 @@ input[type=number]{-moz-appearance:textfield}
   <p style="color:var(--text2);font-size:13px">読み込み中...</p>
 </div>
 
+<!-- 種子消毒の成分名 候補リスト（過去の入力から自動生成） -->
+<datalist id="seed-ingr-list"></datalist>
+
 <!-- ログイン -->
 <div class="screen" id="screen-login">
   <div class="login-box">
@@ -429,7 +432,7 @@ input[type=number]{-moz-appearance:textfield}
         <div id="f-seed-treat-fields" style="display:none">
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">有効成分</label>
-            <input class="form-input" id="f-seed-ingr" type="text" placeholder="例：チウラム、ベノミル">
+            <input class="form-input" id="f-seed-ingr" type="text" list="seed-ingr-list" placeholder="例：チウラム、ベノミル">
           </div>
         </div>
       </div>
@@ -444,7 +447,7 @@ input[type=number]{-moz-appearance:textfield}
         <div id="f-scion-seed-fields" style="display:none;margin-bottom:10px">
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">穂木 有効成分</label>
-            <input class="form-input" id="f-scion-seed-ingr" type="text" placeholder="例：チウラム">
+            <input class="form-input" id="f-scion-seed-ingr" type="text" list="seed-ingr-list" placeholder="例：チウラム">
           </div>
         </div>
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;margin-bottom:6px">
@@ -454,7 +457,7 @@ input[type=number]{-moz-appearance:textfield}
         <div id="f-stock-seed-fields" style="display:none">
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">台木 有効成分</label>
-            <input class="form-input" id="f-stock-seed-ingr" type="text" placeholder="例：ベノミル">
+            <input class="form-input" id="f-stock-seed-ingr" type="text" list="seed-ingr-list" placeholder="例：ベノミル">
           </div>
         </div>
       </div>
@@ -730,7 +733,7 @@ input[type=number]{-moz-appearance:textfield}
       <div id="vm-seed-fields" style="display:none">
         <div class="form-group">
           <label class="form-label">有効成分</label>
-          <input class="form-input" id="vm-seed-ingredient" type="text" placeholder="例：チウラム、ベノミル">
+          <input class="form-input" id="vm-seed-ingredient" type="text" list="seed-ingr-list" placeholder="例：チウラム、ベノミル">
         </div>
         <div class="form-group">
           <label class="form-label">処理時期</label>
@@ -1016,6 +1019,7 @@ function initApp() {
     varietyMaster = lsGet('nae-varietymaster', []);
     leadStats  = lsGet('nae-leadstats', {});
     computeBestStats();
+    refreshSeedIngrList();
 
     // タキイプリセット品種を未登録分だけ追加
     let added = 0;
@@ -1466,6 +1470,7 @@ async function doGdriveRestore() {
     if (Array.isArray(data.varietyMaster)) { varietyMaster = data.varietyMaster; saveVarietyMaster(); }
     if (data.leadStats && typeof data.leadStats === 'object') { leadStats = data.leadStats; saveLeadStats(); }
     computeBestStats();
+    refreshSeedIngrList();
 
     lsSet('nae-last-restore-check', Date.now());
     renderCalendar();
@@ -1814,6 +1819,7 @@ document.getElementById('backup-file').addEventListener('change', e => {
       if (Array.isArray(data.varietyMaster)){ varietyMaster = data.varietyMaster; saveVarietyMaster(); }
       if (data.leadStats && typeof data.leadStats === 'object') { leadStats = data.leadStats; saveLeadStats(); }
       computeBestStats();
+      refreshSeedIngrList();
       renderImportCurrentStats();
       renderCalendar();
       alert('✅ 復元が完了しました！');
@@ -2339,6 +2345,7 @@ function openOrderForm(order = null) {
   const _st = order?.seedTreatment ?? false;
   document.getElementById('f-seed-treat').checked = _st;
   document.getElementById('f-seed-treat-fields').style.display = _st ? '' : 'none';
+  refreshSeedIngrList();   // 過去に入力した成分名を候補に反映
   document.getElementById('f-seed-ingr').value = order?.seedIngredient ?? '';
   const _sst = order?.scionSeedTreatment ?? false;
   document.getElementById('f-scion-seed-treat').checked = _sst;
@@ -2487,6 +2494,32 @@ document.getElementById('f-stock-seed-treat').addEventListener('change', functio
   document.getElementById('f-stock-seed-fields').style.display = this.checked ? '' : 'none';
 });
 
+// 種子消毒の成分名：過去に入力した値を候補として一覧に出す
+function refreshSeedIngrList() {
+  const dl = document.getElementById('seed-ingr-list');
+  if (!dl) return;
+  const seen = new Map();   // 正規化キー → 表示用の元の文字列
+  const add = v => {
+    const s = (v || '').trim();
+    if (!s) return;
+    const key = s.replace(/\s+/g, '').toLowerCase();
+    if (!seen.has(key)) seen.set(key, s);
+  };
+  orders.forEach(o => {
+    add(o.seedIngredient);
+    add(o.scionSeedIngredient);
+    add(o.stockSeedIngredient);
+  });
+  varietyMaster.forEach(v => add(v.seedIngredient));
+
+  dl.innerHTML = '';
+  [...seen.values()].sort((a, b) => a.localeCompare(b, 'ja')).forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    dl.appendChild(opt);
+  });
+}
+
 // 播種数量・出荷数量から出荷率をリアルタイム表示
 function updateYieldDisplay() {
   const sowQ  = parseFloat(document.getElementById('f-sow-qty').value);
@@ -2568,6 +2601,7 @@ document.getElementById('btn-order-submit').onclick = async () => {
   }
   saveOrders();
   computeBestStats();   // ベスト出荷日の学習を更新
+  refreshSeedIngrList();  // 今回入力した成分名も次回から候補に出す
   autoSyncOrderToGcal(savedOrder).catch(() => {});   // 認証済みなら播種日などをスマホ通知へ自動登録
 
   // 品種名を品種マスタに自動登録（未登録のみ）
@@ -3035,6 +3069,7 @@ document.getElementById('btn-variety-master-save').onclick = () => {
     varietyMaster.push({ id: genId(), createdAt: new Date().toISOString(), ...data });
   }
   saveVarietyMaster();
+  refreshSeedIngrList();  // 今回入力した成分名も次回から候補に出す
   renderVarietyMasterList();
   document.getElementById('variety-master-overlay').classList.remove('open');
 };
@@ -3075,6 +3110,7 @@ function renderVarietyMasterList() {
 }
 
 function editVarietyMaster(v) {
+  refreshSeedIngrList();   // 過去に入力した成分名を候補に反映
   document.getElementById('vm-sales').value = v.salesName || '';
   document.getElementById('vm-regname').value = v.regName || '';
   document.getElementById('vm-regnum').value = v.regNumber || '';

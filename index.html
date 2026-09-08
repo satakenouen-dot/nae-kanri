@@ -234,6 +234,8 @@ input[type=number]{-moz-appearance:textfield}
     <span class="month-title" id="month-title"></span>
     <button class="mnav-btn" id="btn-next">›</button>
   </div>
+  <!-- 最終同期の表示 -->
+  <div id="sync-status" style="font-size:10px;text-align:right;padding:2px 12px;background:#fff;color:var(--text2);border-bottom:1px solid var(--border)"></div>
   <!-- 種子未発注アラート -->
   <div id="seed-alert" style="display:none;background:#FFF8E1;border-bottom:2px solid #F9A825;padding:8px 14px;cursor:pointer">
     <div style="font-size:12px;font-weight:700;color:#E65100">🌱 種子未発注の品種</div>
@@ -243,8 +245,8 @@ input[type=number]{-moz-appearance:textfield}
   <div id="gdrive-restore-banner" style="display:none;background:#E3F2FD;border-bottom:2px solid #1565C0;padding:10px 14px;align-items:center;gap:8px">
     <span style="font-size:20px;flex-shrink:0">☁️</span>
     <div style="flex:1;font-size:12px;line-height:1.5">
-      <strong style="font-size:13px">Googleドライブから最新データを取得</strong><br>
-      スマホ・PC間でデータを同期できます
+      <strong style="font-size:13px" id="banner-title">Googleドライブから最新データを取得</strong><br>
+      <span id="banner-sub">スマホ・PC間でデータを同期できます</span>
     </div>
     <button id="btn-restore-banner" style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">取得する</button>
     <button id="btn-restore-banner-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#777;padding:4px;flex-shrink:0">✕</button>
@@ -1180,6 +1182,63 @@ let gdriveTokenClient = null;
 let gdriveAccessToken = null;
 let gdrivePendingAction = null; // 'backup' | 'restore'
 
+// ── 端末をまたいだデータ合体（マージ）────────────────
+// 削除記録：合体時に「消したはずのデータ」が復活しないようにする
+let deletedIds = lsGet('nae-deleted', {});   // { id: 削除時刻ISO }
+function saveDeletedIds() { lsSet('nae-deleted', deletedIds); }
+function markDeleted(id) {
+  if (!id) return;
+  deletedIds[id] = new Date().toISOString();
+  saveDeletedIds();
+}
+
+// IDで突き合わせ、更新時刻の新しい方を採用して合体
+function mergeById(local, remote) {
+  const map = new Map();
+  const keyOf = x => x.id || ('noid:' + JSON.stringify(x));
+  const timeOf = x => x.updatedAt || x.createdAt || '';
+  (remote || []).forEach(r => { if (r) map.set(keyOf(r), r); });
+  (local  || []).forEach(l => {
+    if (!l) return;
+    const k = keyOf(l), r = map.get(k);
+    if (!r) { map.set(k, l); return; }
+    map.set(k, timeOf(l) >= timeOf(r) ? l : r);
+  });
+  return [...map.values()];
+}
+
+// 削除記録より後に更新されていないデータは除外（＝削除を尊重）
+function applyDeletions(list, tombs) {
+  return (list || []).filter(x => {
+    const t = x && x.id ? tombs[x.id] : null;
+    if (!t) return true;
+    return (x.updatedAt || x.createdAt || '') > t;   // 削除後に更新されたなら復活を許す
+  });
+}
+
+// ドライブ側のデータと手元のデータを合体して、手元に反映する
+function mergeRemoteIntoLocal(remote) {
+  if (!remote || typeof remote !== 'object') return { merged: false };
+  const before = orders.length + pestLogs.length;
+  const tombs = Object.assign({}, remote.deletedIds || {}, deletedIds);
+  Object.keys(tombs).forEach(id => {
+    if (!deletedIds[id] || deletedIds[id] < tombs[id]) deletedIds[id] = tombs[id];
+  });
+
+  orders        = applyDeletions(mergeById(orders,        remote.orders),        tombs);
+  pestLogs      = applyDeletions(mergeById(pestLogs,      remote.pestLogs),      tombs);
+  pestMaster    = applyDeletions(mergeById(pestMaster,    remote.pestMaster),    tombs);
+  varietyMaster = applyDeletions(mergeById(varietyMaster, remote.varietyMaster), tombs);
+  if (remote.leadStats && typeof remote.leadStats === 'object') {
+    leadStats = Object.assign({}, remote.leadStats, leadStats);
+  }
+  saveOrders(); savePestLogs(); savePestMaster(); saveVarietyMaster(); saveLeadStats(); saveDeletedIds();
+  computeBestStats();
+  refreshSeedIngrList();
+  const added = (orders.length + pestLogs.length) - before;
+  return { merged: true, added: Math.max(0, added) };
+}
+
 // ── バックアップの保管ルール ──────────────────────────
 const GDRIVE_FOLDER_NAME = '苗管理バックアップ';  // 専用フォルダ
 const GDRIVE_KEEP_DAYS   = 30;                    // 残す世代数（日数）
@@ -1225,17 +1284,34 @@ async function listBackupFiles() {
   return (await res.json()).files || [];
 }
 
-// バックアップ本体を保存（同じ日のファイルがあれば上書き）
+// ドライブ上の最新バックアップを読み込む
+async function fetchLatestBackup(files) {
+  const list = files || await listBackupFiles();
+  if (!list.length) return null;
+  const res = await fetch(
+    'https://www.googleapis.com/drive/v3/files/' + list[0].id + '?alt=media',
+    { headers: gdriveHeaders() });
+  if (res.status === 401 || res.status === 403) throw new Error('AUTH');
+  if (!res.ok) return null;
+  try { return await res.json(); } catch(e) { return null; }
+}
+
+// バックアップ本体を保存（他端末の更新と合体してから保存し、入力の消失を防ぐ）
 async function saveBackupToDrive() {
   const folderId = await ensureBackupFolder();
+  const files = await listBackupFiles();
+
+  // ① 先にドライブの最新を取り込んで合体（他端末で入れた分を消さない）
+  let mergeInfo = { merged: false, added: 0 };
+  const remote = await fetchLatestBackup(files);
+  if (remote) mergeInfo = mergeRemoteIntoLocal(remote);
+
   const json = JSON.stringify({
-    orders, pestLogs, pestMaster, varietyMaster, leadStats,
-    exportedAt: new Date().toISOString(), version: 1
+    orders, pestLogs, pestMaster, varietyMaster, leadStats, deletedIds,
+    exportedAt: new Date().toISOString(), version: 2
   }, null, 2);
   const fileName = 'nae-backup_' + jstStamp(false).split('_')[0] + '.json';  // 1日1ファイル
-
-  const files = await listBackupFiles();
-  const same  = files.find(f => f.name === fileName);
+  const same = files.find(f => f.name === fileName);
 
   if (same) {
     // 同じ日のファイルを中身だけ差し替え（新規に増やさない）
@@ -1263,7 +1339,9 @@ async function saveBackupToDrive() {
     if (res.status === 401 || res.status === 403) throw new Error('AUTH');
     if (!res.ok) throw new Error('API ' + res.status + ': ' + await res.text());
   }
-  return fileName;
+  lsSet('nae-last-sync', Date.now());       // 同期済みの目印
+  renderCalendar();
+  return { fileName, merged: mergeInfo.added };
 }
 
 // 古いバックアップを整理：専用フォルダへ集約し、直近30世代だけ残して残りはゴミ箱へ
@@ -1391,11 +1469,12 @@ async function doGdriveBackup() {
   btn.disabled = true;
   if (labelEl) labelEl.textContent = 'バックアップ中...';
   try {
-    const fileName = await saveBackupToDrive();
+    const sv = await saveBackupToDrive();
     if (labelEl) labelEl.textContent = '整理中...';
     const r = await tidyBackups();
-    let msg = '✅ バックアップ成功\nファイル名: ' + fileName +
+    let msg = '✅ バックアップ成功\nファイル名: ' + sv.fileName +
               '\n\n保存先：Googleドライブの「' + GDRIVE_FOLDER_NAME + '」フォルダ';
+    if (sv.merged) msg += '\n\n🔄 他の端末で入力された ' + sv.merged + '件を取り込んで合体しました。';
     if (r.moved)   msg += '\n\n📁 過去のバックアップ ' + r.moved + '件をフォルダへ移動しました。';
     if (r.trashed) msg += '\n🗑 古いバックアップ ' + r.trashed + '件をゴミ箱へ移しました（直近' + GDRIVE_KEEP_DAYS + '件を保持）。';
     alert(msg);
@@ -1472,13 +1551,78 @@ async function doGdriveRestore() {
     computeBestStats();
     refreshSeedIngrList();
 
+    if (data.deletedIds && typeof data.deletedIds === 'object') {
+      Object.keys(data.deletedIds).forEach(id => {
+        if (!deletedIds[id] || deletedIds[id] < data.deletedIds[id]) deletedIds[id] = data.deletedIds[id];
+      });
+      saveDeletedIds();
+    }
     lsSet('nae-last-restore-check', Date.now());
+    lsSet('nae-last-sync', Date.now());
     renderCalendar();
     alert('✅ 復元完了\n注文: ' + (data.orders?.length || 0) + '件\n農薬: ' + (data.pestLogs?.length || 0) + '件');
   } catch(e) {
     alert('復元失敗: ' + e.message);
   }
 }
+
+// ── ② 画面に戻った時、他の端末の更新を確認（1時間以上あいた場合のみ）──
+const SYNC_CHECK_INTERVAL = 60 * 60 * 1000;   // 1時間
+let syncChecking = false;
+
+async function checkRemoteUpdate() {
+  if (syncChecking || !gdriveAccessToken) return;
+  const last = lsGet('nae-last-sync-check', 0);
+  if (Date.now() - last < SYNC_CHECK_INTERVAL) return;   // 1時間経つまで問い合わせない
+  syncChecking = true;
+  try {
+    const files = await listBackupFiles();
+    lsSet('nae-last-sync-check', Date.now());
+    if (!files.length) return;
+    const newest = files[0];
+    const remoteAt = new Date(newest.createdTime).getTime();
+    const mine = lsGet('nae-last-sync', 0);
+    if (remoteAt <= mine) return;    // 自分が最後に同期した内容なので何もしない
+    showSyncBanner(newest.createdTime);
+  } catch(e) {
+    // 認証切れなどは黙って何もしない（作業の邪魔をしない）
+  } finally {
+    syncChecking = false;
+  }
+}
+
+function showSyncBanner(remoteTime) {
+  const banner = document.getElementById('gdrive-restore-banner');
+  if (!banner) return;
+  document.getElementById('banner-title').textContent = '他の端末で更新されています';
+  document.getElementById('banner-sub').textContent =
+    fmtJST(remoteTime) + ' の入力があります。取り込んでから作業してください。';
+  document.getElementById('btn-restore-banner').textContent = '取り込む';
+  banner.style.display = 'flex';
+
+  document.getElementById('btn-restore-banner').onclick = async () => {
+    banner.style.display = 'none';
+    try {
+      const remote = await fetchLatestBackup();
+      const r = mergeRemoteIntoLocal(remote);
+      lsSet('nae-last-sync', Date.now());
+      renderCalendar();
+      renderOrderList();
+      alert(r.added ? ('✅ 取り込み完了\n他の端末の ' + r.added + '件を追加しました。')
+                    : '✅ 取り込み完了（追加はありませんでした）');
+    } catch(e) {
+      alert('取り込みに失敗しました: ' + e.message);
+    }
+  };
+  document.getElementById('btn-restore-banner-close').onclick = () => {
+    banner.style.display = 'none';
+  };
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkRemoteUpdate();
+});
+window.addEventListener('focus', checkRemoteUpdate);
 
 // 起動時復元バナー
 function showGdriveRestoreBanner() {
@@ -2181,6 +2325,20 @@ function renderCalendar() {
   });
   const todayStr = today();
 
+  // 最終同期の表示（古いほど目立たせる）
+  const _sync = document.getElementById('sync-status');
+  if (_sync) {
+    const t = lsGet('nae-last-sync', 0);
+    if (!t) {
+      _sync.textContent = '☁️ 未同期（終了ボタンでバックアップされます）';
+      _sync.style.color = '#E65100';
+    } else {
+      const h = (Date.now() - t) / 3600000;
+      _sync.textContent = '☁️ 最終同期：' + fmtJST(new Date(t).toISOString());
+      _sync.style.color = h >= 12 ? '#E65100' : 'var(--text2)';
+    }
+  }
+
   // 種子未発注アラート（未播種・未出荷の注文が対象）
   const unprepared = orders.filter(o =>
     !o.seedOrdered &&
@@ -2543,6 +2701,7 @@ document.getElementById('btn-order-form-back').onclick = () => showTab(currentTa
 
 document.getElementById('btn-order-delete').onclick = () => {
   if (!confirm('この注文を削除しますか？')) return;
+  markDeleted(editingOrderId);   // 他端末との合体時に復活させない
   orders = orders.filter(o => o.id !== editingOrderId);
   saveOrders();
   computeBestStats();
@@ -2554,6 +2713,37 @@ document.getElementById('btn-order-submit').onclick = async () => {
   const crop     = document.getElementById('f-crop').value;
   const delivery = document.getElementById('f-delivery').value;
   if (!crop || !delivery) { alert('品目と納品予定日は必須です'); return; }
+
+  // ── ③ 新規追加時のみ、似た注文がないか確認（二重入力の防止）──
+  if (!editingOrderId) {
+    const _cust = document.getElementById('f-customer').value.trim();
+    const _isG  = isGraft(document.getElementById('f-type').value);
+    const _var  = _isG
+      ? [document.getElementById('f-variety-scion').value.trim(),
+         document.getElementById('f-variety-stock').value.trim()].filter(Boolean).join('×')
+      : document.getElementById('f-variety-single').value.trim();
+    const _dDate = parseLocalDate(delivery);
+    const dup = orders.find(o => {
+      if ((o.customer || '').trim() !== _cust) return false;
+      if ((o.crop || '') !== crop) return false;
+      if ((o.variety || '').trim() !== _var) return false;
+      if (!o.delivery) return false;
+      const diff = Math.abs((parseLocalDate(o.delivery) - _dDate) / 86400000);
+      return diff <= 7;   // 納期が1週間以内なら同じ注文の可能性が高い
+    });
+    if (dup) {
+      const ok = confirm(
+        '⚠️ 似た注文が既に登録されています\n\n' +
+        '　' + (dup.customer || '(注文主なし)') + '\n' +
+        '　' + dup.crop + (dup.variety ? '／' + dup.variety : '') + '\n' +
+        '　数量：' + (dup.qty || '—') + '　納期：' + fmtJP(dup.delivery) + '\n' +
+        '　入力日：' + (dup.orderDate ? fmtJP(dup.orderDate) : '—') + '\n\n' +
+        '二重入力ではありませんか？\n\n' +
+        '［OK］別の注文として保存する\n［キャンセル］保存をやめる'
+      );
+      if (!ok) return;
+    }
+  }
 
   const btn = document.getElementById('btn-order-submit');
   btn.disabled = true; btn.textContent = '保存中…';
@@ -3005,6 +3195,7 @@ function renderMasterList() {
     div.querySelector('.btn-danger').onclick = e => {
       e.stopPropagation();
       if (!confirm(`「${p.name}」を削除しますか？`)) return;
+      markDeleted(p.id);
       pestMaster = pestMaster.filter(x => x.id !== p.id);
       savePestMaster();
       renderMasterList();
@@ -3101,6 +3292,7 @@ function renderVarietyMasterList() {
     div.querySelector('.btn-danger').onclick = e => {
       e.stopPropagation();
       if (!confirm(`「${v.salesName}」を削除しますか？`)) return;
+      markDeleted(v.id);
       varietyMaster = varietyMaster.filter(x => x.id !== v.id);
       saveVarietyMaster();
       renderVarietyMasterList();
@@ -3200,6 +3392,7 @@ document.getElementById('btn-pest-clear').onclick = () => clearPestSelection();
 
 document.getElementById('btn-pest-delete').onclick = () => {
   if (!confirm('この記録を削除しますか？')) return;
+  markDeleted(editingPestId);
   pestLogs = pestLogs.filter(p => p.id !== editingPestId);
   savePestLogs();
   renderCalendar();

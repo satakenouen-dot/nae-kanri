@@ -929,7 +929,74 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
+// ── 注文フォームの未保存検知 & 下書き自動保存 ──────────
+const ORDER_FIELDS = [
+  'f-orderDate','f-customer','f-phone','f-type-sel','f-type','f-crop',
+  'f-variety-single','f-variety-scion','f-variety-stock','f-qty','f-price',
+  'f-delivery','f-sow','f-graft','f-ship','f-best','f-pot','f-memo',
+  'f-sow-qty','f-ship-qty','f-seed-ordered','f-seed-treat','f-seed-ingr',
+  'f-scion-seed-treat','f-scion-seed-ingr','f-stock-seed-treat','f-stock-seed-ingr'
+];
+let orderFormBaseline = '';       // フォームを開いた時点の内容
+let draftSaveTimer = null;
+
+function readOrderForm() {
+  const v = {};
+  ORDER_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    v[id] = (el.type === 'checkbox') ? el.checked : el.value;
+  });
+  return v;
+}
+function writeOrderForm(v) {
+  ORDER_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || !(id in v)) return;
+    if (el.type === 'checkbox') el.checked = !!v[id]; else el.value = v[id];
+  });
+}
+function orderFormSnapshot() { return JSON.stringify(readOrderForm()); }
+function isOrderFormOpen() {
+  const s = document.getElementById('screen-order-form');
+  return !!s && s.classList.contains('active');
+}
+function hasUnsavedOrderChanges() {
+  return isOrderFormOpen() && orderFormSnapshot() !== orderFormBaseline;
+}
+function markOrderFormSaved() { orderFormBaseline = orderFormSnapshot(); }
+
+// 入力途中の内容を下書きとして自動保存（電池切れ・誤操作からの保険）
+function saveOrderDraft() {
+  if (!isOrderFormOpen()) return;
+  const v = readOrderForm();
+  // 中身が実質空なら下書きにしない
+  if (!(v['f-customer'] || '').trim() && !(v['f-crop'] || '') &&
+      !(v['f-variety-single'] || '').trim() && !(v['f-variety-scion'] || '').trim() &&
+      !(v['f-qty'] || '').trim() && !(v['f-memo'] || '').trim()) return;
+  lsSet('nae-order-draft', { editingOrderId, values: v, at: new Date().toISOString() });
+}
+function clearOrderDraft() { localStorage.removeItem('nae-order-draft'); }
+function scheduleDraftSave() {
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(saveOrderDraft, 600);
+}
+
+// ⑶ 別画面へ移る時の警告（下書きは残すので後から復元できる）
+function confirmLeaveOrderForm() {
+  if (!hasUnsavedOrderChanges()) return true;
+  const ok = confirm(
+    '⚠️ 入力中の注文が保存されていません\n\n' +
+    'このまま移動すると、入力内容は保存されません。\n' +
+    '（下書きは残るので、次回「続きから入力」できます）\n\n' +
+    '［OK］移動する　［キャンセル］入力に戻る'
+  );
+  if (ok) saveOrderDraft();   // 移動前に下書きを確定させておく
+  return ok;
+}
+
 function showTab(tab) {
+  if (!confirmLeaveOrderForm()) return;
   currentTab = tab;
   document.querySelectorAll('.bnav-item').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === tab));
@@ -1049,6 +1116,8 @@ function initApp() {
     if (Date.now() - _lastCheck > 60 * 60 * 1000) {
       showGdriveRestoreBanner();
     }
+    // ⑵ 保存されずに終わった入力があれば復元を促す
+    setTimeout(offerOrderDraft, 400);
   } catch(e) {
     console.error('initApp error:', e);
     document.getElementById('loading').innerHTML =
@@ -1680,6 +1749,18 @@ async function doExitBackup() {
 }
 
 document.getElementById('btn-exit-app').onclick = () => {
+  // ⑴ 未保存の入力があれば、消える前に止める
+  if (hasUnsavedOrderChanges()) {
+    saveOrderDraft();
+    const save = confirm(
+      '⚠️ 入力中の注文が保存されていません\n\n' +
+      'このまま終了すると、この入力はバックアップされません。\n\n' +
+      '［OK］入力画面に戻って保存する\n' +
+      '［キャンセル］保存せずに進む'
+    );
+    if (save) return;   // 入力画面に留まる
+    if (!confirm('保存せずに終了します。\n入力内容はバックアップされません。\n\n本当に終了しますか？\n（下書きは残るので次回復元できます）')) return;
+  }
   if (!confirm('Googleドライブにバックアップしてアプリを終了しますか？')) return;
   if (!gdriveAccessToken) {
     if (!gdriveTokenClient) { alert('Google APIの初期化中です。少し待ってから再度お試しください。'); return; }
@@ -1704,8 +1785,16 @@ async function autoBackupSilent() {
     // サイレント失敗
   }
 }
+// ⑶ ブラウザやタブを閉じようとした時の警告（未保存の入力がある場合のみ）
+window.addEventListener('beforeunload', (e) => {
+  if (!hasUnsavedOrderChanges()) return;
+  saveOrderDraft();          // 閉じられても下書きは残す
+  e.preventDefault();
+  e.returnValue = '';        // ブラウザ標準の確認ダイアログを出す
+});
+
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') autoBackupSilent();
+  if (document.visibilityState === 'hidden') { saveOrderDraft(); autoBackupSilent(); }
 });
 window.addEventListener('pagehide', () => autoBackupSilent());
 
@@ -2520,6 +2609,41 @@ function openOrderForm(order = null) {
   updateSuggest();
   renderVarietySuggests();
   showScreen('screen-order-form');
+  markOrderFormSaved();   // この時点を「未編集」の基準にする
+}
+
+// 入力を監視して下書きを自動保存
+ORDER_FIELDS.forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input',  scheduleDraftSave);
+  el.addEventListener('change', scheduleDraftSave);
+});
+
+// 前回の入力途中データがあれば復元を促す
+function offerOrderDraft() {
+  const d = lsGet('nae-order-draft', null);
+  if (!d || !d.values) return;
+  const v = d.values;
+  const label = [(v['f-customer'] || '').trim(), v['f-crop'] || '',
+                 (v['f-variety-single'] || v['f-variety-scion'] || '').trim()]
+                .filter(Boolean).join('／') || '(内容なし)';
+  const ok = confirm(
+    '📝 前回、保存されずに終了した入力があります\n\n' +
+    '　' + label + '\n' +
+    '　入力日時：' + fmtJST(d.at) + '\n\n' +
+    '［OK］続きから入力する　［キャンセル］破棄する'
+  );
+  if (ok) {
+    const target = d.editingOrderId ? orders.find(o => o.id === d.editingOrderId) : null;
+    openOrderForm(target || null);
+    writeOrderForm(v);
+    updateVarietyFields();
+    updateYieldDisplay();
+    updateSuggest();
+  } else {
+    clearOrderDraft();
+  }
 }
 
 function updateSuggest() {
@@ -2702,6 +2826,8 @@ document.getElementById('btn-order-form-back').onclick = () => showTab(currentTa
 document.getElementById('btn-order-delete').onclick = () => {
   if (!confirm('この注文を削除しますか？')) return;
   markDeleted(editingOrderId);   // 他端末との合体時に復活させない
+  markOrderFormSaved();          // 削除したので未保存警告は不要
+  clearOrderDraft();
   orders = orders.filter(o => o.id !== editingOrderId);
   saveOrders();
   computeBestStats();
@@ -2844,6 +2970,8 @@ document.getElementById('btn-order-submit').onclick = async () => {
     if (changed) saveVarietyMaster();
   })();
 
+  markOrderFormSaved();   // 保存済みなので移動時の警告を出さない
+  clearOrderDraft();      // 下書きは役目を終えたので削除
   renderCalendar();
   showTab(currentTab === 'calendar' ? 'calendar' : 'orders');
 

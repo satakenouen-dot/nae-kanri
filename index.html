@@ -2148,6 +2148,18 @@ function fmtJP(s) {
   return `${parseInt(m)}月${parseInt(d)}日`;
 }
 function today() { return dateToLocal(new Date()); }
+// 年をまたぐ日付だけ年を補って表示する（同じ年なら従来どおり「2月25日」）
+// mode:'short' は印刷の列幅を保つため「'27 2月25日」と小さく年を付ける
+function fmtJPY(s, mode) {
+  if (!s) return '';
+  const y = s.slice(0, 4);
+  if (y === today().slice(0, 4)) return fmtJP(s);
+  return mode === 'short'
+    ? "<small>'" + y.slice(2) + "</small>" + fmtJP(s)
+    : y + '年' + fmtJP(s);
+}
+// 年を必ず付ける（お客様へ渡す書類用）
+function fmtJPFull(s) { return s ? s.slice(0, 4) + '年' + fmtJP(s) : ''; }
 // UTC(ISO)文字列を日本時間の "YYYY/MM/DD HH:mm" で表示
 function fmtJST(iso) {
   if (!iso) return '';
@@ -2504,7 +2516,7 @@ function renderCalendar() {
         row.innerHTML =
           '<span>' + (o.variety || o.crop || '') + (o.type ? '（' + o.type + '）' : '') +
           (o.customer ? '　' + o.customer : '') + '</span>' +
-          '<span style="white-space:nowrap">予定 ' + fmtJP(o.sowDate) + '・' + days + '日超過 ›</span>';
+          '<span style="white-space:nowrap">予定 ' + fmtJPY(o.sowDate) + '・' + days + '日超過 ›</span>';
         row.onclick = () => openOrderForm(o);
         listEl.appendChild(row);
       });
@@ -2739,7 +2751,7 @@ function alertOverdueSowing() {
   const lines = list.slice(0, 8).map(o => {
     const days = Math.round((parseLocalDate(td) - parseLocalDate(o.sowDate)) / 86400000);
     return '・' + (o.variety || o.crop || '') + (o.customer ? '（' + o.customer + '）' : '') +
-           '　予定' + fmtJP(o.sowDate) + '／' + days + '日超過';
+           '　予定' + fmtJPY(o.sowDate) + '／' + days + '日超過';
   });
   if (list.length > 8) lines.push('…ほか ' + (list.length - 8) + '件');
   alert('⚠️ 播種忘れの可能性があります（' + list.length + '件）\n\n' +
@@ -3226,12 +3238,12 @@ function renderOrderList() {
         <div class="list-icon" style="background:${s.iconBg}">${isGraft(o.type) ? '✂️' : s.icon}</div>
         <div class="list-body">
           <div class="list-title">${o.crop}${o.variety ? ' / ' + o.variety : ''}</div>
-          <div class="list-sub">納品：${fmtJP(o.delivery)}${o.qty ? '　' + o.qty : ''}${o.customer ? '　' + o.customer : ''}</div>
+          <div class="list-sub">納品：${fmtJPY(o.delivery)}${o.qty ? '　' + o.qty : ''}${o.customer ? '　' + o.customer : ''}</div>
           <div class="list-sub">${o.sowDateActual
-              ? '播種：' + fmtJP(o.sowDateActual) + (o.sowTrays ? '（' + o.sowTrays + '枚）' : '')
-              : '播種予定：' + (fmtJP(o.sowDate) || '未設定') +
+              ? '播種：' + fmtJPY(o.sowDateActual) + (o.sowTrays ? '（' + o.sowTrays + '枚）' : '')
+              : '播種予定：' + (fmtJPY(o.sowDate) || '未設定') +
                 (isSowOverdue(o, todayStr) ? ' <span style="color:#c62828;font-weight:700">⚠️未播種</span>' : '')
-            }${status==='shipped' ? '　出荷：'+fmtJP(o.shipDate) : ''}</div>
+            }${status==='shipped' ? '　出荷：'+fmtJPY(o.shipDate) : ''}</div>
           <div style="margin-top:5px">${seedBadge}</div>
         </div>
         <div class="list-arrow">›</div>`;
@@ -4183,7 +4195,7 @@ function printOrderList() {
 
   if (!list.length) { alert('未出荷の注文がありません'); return; }
 
-  const md = s => s ? fmtJP(s) : '';   // 「7月5日」形式で列を狭く保つ
+  const md = s => s ? fmtJPY(s, 'short') : '';   // 年をまたぐ日付だけ「'27 2月25日」と年を補う
   const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
   const rows = list.map((o, i) => {
@@ -4240,7 +4252,7 @@ function printOrderList() {
 <body>
 <div class="head">
   <h1>${title}</h1>
-  <div class="sub">印刷日：${fmtPrint(_today)}　未出荷 ${list.length}件（■薄青 = 未播種／■赤★ = 予定日を過ぎて未播種）</div>
+  <div class="sub">印刷日：${fmtPrint(_today)}　未出荷 ${list.length}件（■薄青 = 未播種／■赤★ = 予定日を過ぎて未播種／'27 = 2027年）</div>
 </div>
 <table>
   <colgroup>
@@ -4282,30 +4294,42 @@ function printOrderAcceptance() {
   const o = getCurrentOrder();
   if (!o) { alert('注文を保存してからご利用ください'); return; }
 
-  // 同じ注文主の未出荷分をすべて記載（今回の注文は出荷済みでも必ず含める）
+  // 同じ注文主の「これから納品する分」を記載（今回の注文は必ず含める）
+  // 納期が過ぎた未出荷注文は前シーズンの記録漏れの可能性が高いので載せない
   const cust = (o.customer || '').trim();
   const _td = today();
+  const stale = [];
   const rows = orders.filter(x => {
     if ((x.customer || '').trim() !== cust) return false;
     if (x.id === o.id) return true;                       // 今開いている注文は必ず記載
-    return !(x.shipDate && x.shipDate <= _td);            // 未出荷のみ
+    if (x.shipDate && x.shipDate <= _td) return false;    // 出荷済み
+    if (x.delivery && x.delivery < _td) { stale.push(x); return false; }  // 納期が過ぎている
+    return true;
   }).sort((a, b) =>
     (a.orderDate || '9999').localeCompare(b.orderDate || '9999') ||
     (a.delivery  || '9999').localeCompare(b.delivery  || '9999')
   );
   const list = rows.length ? rows : [o];
 
+  // 出荷完了の記録漏れを知らせる（引受書には載せないが、放置すると各所に影響するため）
+  if (stale.length) {
+    alert('ℹ️ この注文主には、納期を過ぎたのに出荷完了が記録されていない注文が ' + stale.length + '件あります。\n\n' +
+      stale.slice(0, 5).map(x => '・' + (x.variety || x.crop || '') + '　納期 ' + fmtJPFull(x.delivery)).join('\n') +
+      (stale.length > 5 ? '\n…ほか ' + (stale.length - 5) + '件' : '') +
+      '\n\n引受書には載せません。納品済みであれば、その注文を開いて「📦 出荷完了を記録」してください。');
+  }
+
   const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const yen = v => (v === '' || v == null) ? '' : Number(v).toLocaleString('ja-JP') + '円';
 
   const bodyRows = list.map(x => `<tr>
-      <td class="c">${x.orderDate ? fmtJP(x.orderDate) : ''}</td>
+      <td class="c">${fmtJPFull(x.orderDate)}</td>
       <td>${esc(x.crop)}</td>
       <td>${esc(x.variety)}</td>
       <td class="r">${esc(x.qty)}</td>
       <td class="r">${yen(x.price)}</td>
-      <td class="c">${x.sowDate ? fmtJP(x.sowDate) : ''}</td>
-      <td class="c">${x.delivery ? fmtJP(x.delivery) : ''}</td>
+      <td class="c">${fmtJPFull(x.sowDate)}</td>
+      <td class="c">${fmtJPFull(x.delivery)}</td>
     </tr>`).join('');
   // 記入欄として最低5行を確保
   const blanks = Array.from({ length: Math.max(0, 5 - list.length) },
@@ -4326,7 +4350,7 @@ function printOrderAcceptance() {
   .lead { margin: 10px 0 6px; }
   /* 外枠は2pxの太線。右端の縦線が端数位置に来て細く見えるのを防ぐ */
   table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 12px; border: 2px solid #000; }
-  th, td { border: 1px solid #000; padding: 5px 4px; font-size: 9pt; height: 26px; vertical-align: middle; word-break: break-all; }
+  th, td { border: 1px solid #000; padding: 5px 4px; font-size: 8.5pt; height: 26px; vertical-align: middle; word-break: break-all; }
   th { background: #eee; text-align: center; font-weight: 700; }
   tr { page-break-inside: avoid; }
   thead { display: table-header-group; }
@@ -4359,7 +4383,7 @@ function printOrderAcceptance() {
 
 <table>
   <colgroup>
-    <col style="width:10%"><col style="width:13%"><col style="width:31%"><col style="width:10%"><col style="width:12%"><col style="width:10%"><col style="width:14%">
+    <col style="width:13%"><col style="width:12%"><col style="width:27%"><col style="width:9%"><col style="width:13%"><col style="width:13%"><col style="width:13%">
   </colgroup>
   <thead>
     <tr><th>受注日</th><th>品目</th><th>品種</th><th>本数</th><th>単価(税別)</th><th>播種日</th><th>納品予定日</th></tr>

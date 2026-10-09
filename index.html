@@ -3501,14 +3501,25 @@ function renderCropCheckboxes(cropData) {
     wrap.innerHTML = '<div style="padding:8px;font-size:12px;color:var(--text2);text-align:center">該当する野菜がありません</div>';
     return;
   }
-  // チェック済みを先頭に
-  list = [...list].sort((a,b) => ((cropData[b]?.checked)?1:0) - ((cropData[a]?.checked)?1:0));
+  // 並び順：①この農薬でチェック済み ②一度でも注文で使った品目 ③その他（各グループ内は50音順）
+  const used = new Set(orders.map(o => (o.crop || '').trim()).filter(Boolean));
+  const rank = c => (cropData[c]?.checked ? 0 : used.has(c) ? 1 : 2);
+  list = [...list].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'ja'));
+
+  const hasTop = list.some(c => rank(c) < 2);   // 上位に出す品目があるか
+  let shownDivider = false;
   wrap.innerHTML = list.map(c => {
+    // 使用実績のある品目と、その他の境目に区切りを入れる
+    let divider = '';
+    if (!filter && hasTop && !shownDivider && rank(c) === 2) {
+      shownDivider = true;
+      divider = '<div style="margin:6px 0 3px;padding-top:5px;border-top:1px dashed var(--border);font-size:11px;color:var(--text2)">── 以下は使用実績のない品目（50音順）──</div>';
+    }
     const entry = cropData[c] || {};
     const ck = entry.checked ? 'checked' : '';
     const dil = (entry.dilution || '').replace(/"/g, '&quot;');
     const bg = entry.checked ? 'background:#e8f5e9;' : '';
-    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 6px;${bg}border-radius:4px">
+    return `${divider}<div style="display:flex;align-items:center;gap:6px;padding:3px 6px;${bg}border-radius:4px">
       <input type="checkbox" data-crop="${c}" ${ck} style="width:16px;height:16px;accent-color:var(--green);flex-shrink:0">
       <span style="flex:1;font-size:13px">${c}</span>
       <input type="text" data-dil="${c}" value="${dil}" placeholder="希釈倍率" style="width:100px;padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:12px;${entry.checked?'':'opacity:0.4'}">

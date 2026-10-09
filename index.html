@@ -463,6 +463,7 @@ input[type=number]{-moz-appearance:textfield}
 
       <!-- 種子消毒（実生・その他用） -->
       <div id="f-seed-single-block" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <div id="f-seed-note" style="font-size:11px;line-height:1.5;margin-bottom:5px"></div>
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;font-size:13px;margin-bottom:6px">
           <input type="checkbox" id="f-seed-treat" style="width:20px;height:20px;accent-color:#795548;flex-shrink:0">
           🧪 種子消毒あり
@@ -477,7 +478,8 @@ input[type=number]{-moz-appearance:textfield}
 
       <!-- 種子消毒（接ぎ木用：穂木・台木） -->
       <div id="f-seed-graft-block" style="display:none;border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text)">🧪 種子消毒</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;color:var(--text)">🧪 種子消毒</div>
+        <div id="f-seed-note-graft" style="font-size:11px;line-height:1.5;margin-bottom:6px"></div>
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;margin-bottom:6px">
           <input type="checkbox" id="f-scion-seed-treat" style="width:20px;height:20px;accent-color:#795548;flex-shrink:0">
           穂木 種子消毒あり
@@ -2732,6 +2734,13 @@ function openOrderForm(order = null) {
   document.getElementById('f-stock-seed-treat').checked = _tst;
   document.getElementById('f-stock-seed-fields').style.display = _tst ? '' : 'none';
   document.getElementById('f-stock-seed-ingr').value = order?.stockSeedIngredient ?? '';
+  // 種子消毒が未記録の注文（新規・過去分）は品種マスタから自動で補う
+  lastSeedVarietyKey = '';
+  if (!order || !order.seedInfoRecorded) {
+    applySeedFromMaster(true);    // 未記録なら品種マスタの内容を入れる
+  } else {
+    refreshSeedNoteOnly();        // 記録済みの値はそのまま残す
+  }
   document.getElementById('btn-print-hist').style.display = order ? '' : 'none';
   // 保存済み注文のときだけ操作ブロックを表示（新規追加時は非表示で入力欄を広く）
   document.getElementById('order-actions-section').style.display = order ? '' : 'none';
@@ -2918,6 +2927,8 @@ function renderVarietySuggests() {
       btn.onclick = () => {
         if (graft) { onClickScion(item.scion); onClickStock(item.stock); }
         else { onClickScion(item.label); }
+        applySeedFromMaster(false);   // 品種を選んだら種子消毒も自動で反映
+        scheduleDraftSave();
       };
       wrap.appendChild(btn);
     });
@@ -2942,7 +2953,83 @@ function updateVarietyFields() {
   document.getElementById('f-seed-single-block').style.display   = graft ? 'none' : '';
   document.getElementById('f-seed-graft-block').style.display    = graft ? '' : 'none';
   document.getElementById('f-graft-label').textContent = graft ? '接ぎ木日（確定）' : '定植日';
+  applySeedFromMaster(true);   // 実生⇄接ぎ木が切り替わるので対象の欄を入れ直す
 }
+
+// ── 種子消毒：品種マスタから自動入力 ────────────────────
+// 同じ品種なら処理内容は変わらないので、品種を入れた時点で前回の設定を引き継ぐ
+let lastSeedVarietyKey = '';   // 直近に自動入力した品種の組み合わせ
+
+function setSeedFields(prefix, reg) {
+  const chk = document.getElementById(prefix + 'treat');
+  const ing = document.getElementById(prefix + 'ingr');
+  const fld = document.getElementById(prefix + 'fields');
+  if (!chk || !ing) return;
+  chk.checked = !!(reg && reg.seedTreatment);
+  ing.value   = (reg && reg.seedTreatment) ? (reg.seedIngredient || '') : '';
+  if (fld) fld.style.display = chk.checked ? '' : 'none';
+}
+
+// 現在の品種欄から、対応する品種マスタの情報を取り出す
+function currentSeedVarietyInfo() {
+  const graft = isGraft(document.getElementById('f-type').value);
+  const scionName = graft ? document.getElementById('f-variety-scion').value.trim()
+                          : document.getElementById('f-variety-single').value.trim();
+  const stockName = graft ? document.getElementById('f-variety-stock').value.trim() : '';
+  return {
+    graft, scionName, stockName,
+    key: graft ? ('G:' + scionName + '×' + stockName) : ('S:' + scionName),
+    scionReg: scionName ? lookupVarietyReg(scionName) : null,
+    stockReg: stockName ? lookupVarietyReg(stockName) : null
+  };
+}
+
+// 品種欄の内容から種子消毒を自動反映する（force=trueで無条件に上書き）
+function applySeedFromMaster(force) {
+  const i = currentSeedVarietyInfo();
+  if (!force && i.key === lastSeedVarietyKey) return;   // 品種が変わっていなければ何もしない
+  lastSeedVarietyKey = i.key;
+  if (i.graft) {
+    setSeedFields('f-scion-seed-', i.scionReg);
+    setSeedFields('f-stock-seed-', i.stockReg);
+  } else {
+    setSeedFields('f-seed-', i.scionReg);
+  }
+  updateSeedNote(i.graft, i.scionName, i.stockName, i.scionReg, i.stockReg);
+}
+
+// 入力値は変えず、説明表示だけ更新する（記録済みの注文を開いた時用）
+function refreshSeedNoteOnly() {
+  const i = currentSeedVarietyInfo();
+  lastSeedVarietyKey = i.key;
+  updateSeedNote(i.graft, i.scionName, i.stockName, i.scionReg, i.stockReg);
+}
+
+// ③ どこから入った値かを表示（初めての品種なら入力を促す）
+function updateSeedNote(graft, scionName, stockName, scionReg, stockReg) {
+  const el = document.getElementById(graft ? 'f-seed-note-graft' : 'f-seed-note');
+  const other = document.getElementById(graft ? 'f-seed-note' : 'f-seed-note-graft');
+  if (other) other.innerHTML = '';
+  if (!el) return;
+  const names = graft ? [scionName, stockName].filter(Boolean) : [scionName].filter(Boolean);
+  if (!names.length) { el.innerHTML = ''; return; }
+  const regs  = graft ? [scionReg, stockReg] : [scionReg];
+  const known = regs.some(r => r);                       // 品種マスタに登録がある
+  const anyTreat = regs.some(r => r && r.seedTreatment);
+  if (anyTreat) {
+    el.innerHTML = '<span style="color:#2e7d32">✅ 品種マスタの設定を自動で反映しました（変更したい場合のみ直してください）</span>';
+  } else if (known) {
+    el.innerHTML = '<span style="color:var(--text2)">品種マスタに種子消毒の登録はありません</span>';
+  } else {
+    el.innerHTML = '<span style="color:#E65100">🆕 初めての品種です。種子消毒があれば入力してください（次回から自動で入ります）</span>';
+  }
+}
+
+// 品種・規格を変えたら自動反映
+['f-variety-single','f-variety-scion','f-variety-stock'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', () => applySeedFromMaster(false));
+});
 
 // 種子消毒チェック ON/OFF で成分欄を表示切り替え
 document.getElementById('f-seed-treat').addEventListener('change', function() {
@@ -3082,6 +3169,7 @@ document.getElementById('btn-order-submit').onclick = async () => {
     seedIngredient:     document.getElementById('f-seed-treat').checked ? document.getElementById('f-seed-ingr').value.trim() : '',
     scionSeedTreatment: document.getElementById('f-scion-seed-treat').checked,
     scionSeedIngredient:document.getElementById('f-scion-seed-treat').checked ? document.getElementById('f-scion-seed-ingr').value.trim() : '',
+    seedInfoRecorded:   true,   // この注文は種子消毒の内容を保存済み（印刷時に品種マスタを見に行かない）
     stockSeedTreatment: document.getElementById('f-stock-seed-treat').checked,
     stockSeedIngredient:document.getElementById('f-stock-seed-treat').checked ? document.getElementById('f-stock-seed-ingr').value.trim() : '',
     updatedAt:   new Date().toISOString()
@@ -3140,12 +3228,16 @@ document.getElementById('btn-order-submit').onclick = async () => {
           updatedAt: new Date().toISOString()
         });
         changed = true;
-      } else if (seedTreatment && !existing.seedTreatment) {
-        // 既存品種に種子消毒情報を追記（未設定だった場合のみ）
-        existing.seedTreatment = true;
-        existing.seedIngredient = seedIngredient || existing.seedIngredient;
-        existing.seedTiming = existing.seedTiming || '播種前（種子）';
-        changed = true;
+      } else if (seedTreatment) {
+        // 入力された種子消毒を品種マスタにも反映（次回同じ品種を選べば自動で入る）
+        const ingrChanged = seedIngredient && seedIngredient !== existing.seedIngredient;
+        if (!existing.seedTreatment || ingrChanged) {
+          existing.seedTreatment = true;
+          existing.seedIngredient = seedIngredient || existing.seedIngredient;
+          existing.seedTiming = existing.seedTiming || '播種前（種子）';
+          existing.updatedAt = new Date().toISOString();
+          changed = true;
+        }
       }
     });
     if (changed) saveVarietyMaster();
@@ -3986,22 +4078,24 @@ function printPestHistory() {
     return `<tr style="background:#fffde7"><td>${ingr || '—'}</td><td></td><td>${timing || '播種前（種子）'}</td><td>${kindLabel}</td></tr>`;
   }
   const _graft = isGraft(order.type);
+  // 種子消毒の値を決める：この注文に記録があればそれを使い（記録時点の内容を残す）、
+  // 記録がない注文（過去データ）は品種マスタの設定で補う
+  const rec = !!order.seedInfoRecorded;
+  const pick = (oTreat, oIngr, reg) => rec
+    ? { treat: !!oTreat, ingr: oIngr || '' }
+    : { treat: !!(reg && reg.seedTreatment), ingr: (reg && reg.seedIngredient) || '' };
+
   let seedLines;
   if (_graft) {
-    // 接ぎ木：穂木・台木それぞれ（注文データ優先 → 品種マスタ）
-    const scionTreat = order.scionSeedTreatment ?? scionReg?.seedTreatment ?? false;
-    const scionIngr  = order.scionSeedIngredient || scionReg?.seedIngredient || '';
-    const stockTreat = order.stockSeedTreatment ?? stockReg?.seedTreatment ?? false;
-    const stockIngr  = order.stockSeedIngredient || stockReg?.seedIngredient || '';
+    const s = pick(order.scionSeedTreatment, order.scionSeedIngredient, scionReg);
+    const t = pick(order.stockSeedTreatment, order.stockSeedIngredient, stockReg);
     seedLines = [
-      seedRow(scionTreat, scionIngr, scionReg?.seedTiming, '穂木'),
-      seedRow(stockTreat, stockIngr, stockReg?.seedTiming, '台木'),
+      seedRow(s.treat, s.ingr, scionReg?.seedTiming, '穂木'),
+      seedRow(t.treat, t.ingr, stockReg?.seedTiming, '台木'),
     ].filter(Boolean).join('');
   } else {
-    // 実生：単一（注文データ優先 → 品種マスタ）
-    const treat = order.seedTreatment ?? scionReg?.seedTreatment ?? false;
-    const ingr  = order.seedIngredient || scionReg?.seedIngredient || '';
-    seedLines = seedRow(treat, ingr, scionReg?.seedTiming, '');
+    const s = pick(order.seedTreatment, order.seedIngredient, scionReg);
+    seedLines = seedRow(s.treat, s.ingr, scionReg?.seedTiming, '');
   }
 
   const pestLines = usedPests.map(p => {

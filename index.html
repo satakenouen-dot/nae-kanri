@@ -4120,7 +4120,7 @@ function printPestHistory() {
   }).join("");
   const seedRowCount = seedLines ? seedLines.split('<tr').length - 1 : 0;
   const totalRows  = usedPests.length + seedRowCount;
-  const emptyRows = Math.max(0, 11 - totalRows);
+  const emptyRows = Math.max(0, 14 - totalRows);   // A4の下半分が空かないよう記入欄を確保
   const blankRows = Array(emptyRows).fill('<tr><td></td><td></td><td></td><td></td></tr>').join('');
 
   const html = `<!DOCTYPE html>
@@ -4136,7 +4136,7 @@ function printPestHistory() {
   * { box-sizing: border-box; }
   html, body {
     font-family: "ＭＳ Ｐゴシック","MS PGothic",sans-serif;
-    font-size: 9.5pt;
+    font-size: 12pt;
     color: #000;
     margin: 0; padding: 0;
     width: 186mm;   /* A4 210mm - 12mm*2 */
@@ -4144,59 +4144,62 @@ function printPestHistory() {
     overflow: hidden;
   }
   h1 {
-    text-align: center; font-size: 15pt; letter-spacing: 6px;
-    margin: 0 0 5px; padding: 0;
+    text-align: center; font-size: 21pt; letter-spacing: 8px;
+    margin: 0 0 9px; padding: 0;
   }
   /* ── 注文情報ボックス ── */
   .header-box {
-    border: 2px solid #000; padding: 4px 10px;
-    margin-bottom: 5px; line-height: 1.65;
+    border: 2px solid #000; padding: 8px 12px;
+    margin-bottom: 8px; line-height: 1.8;
     display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px;
   }
   .header-box .full { grid-column: 1/-1; }
-  .header-box .label { color: #444; font-size: 8pt; }
-  .big { font-size: 12pt; font-weight: bold; }
+  .header-box .label { color: #444; font-size: 10.5pt; }
+  .big { font-size: 16pt; font-weight: bold; }
   /* ── 品種登録ボックス ── */
   .reg-box {
-    border: 1px solid #000; padding: 3px 10px;
-    margin-bottom: 5px; font-size: 8.5pt; line-height: 1.65;
+    border: 1px solid #000; padding: 6px 12px;
+    margin-bottom: 8px; font-size: 11pt; line-height: 1.8;
   }
-  .reg-box .reg-title { font-weight: bold; font-size: 8pt; }
+  .reg-box .reg-title { font-weight: bold; font-size: 10.5pt; }
   /* ── 日付行 ── */
   .dates {
-    font-size: 9.5pt; margin-bottom: 5px; line-height: 1.5;
+    font-size: 12pt; margin-bottom: 8px; line-height: 1.6;
     display: flex; gap: 20px;
   }
   .dates span { white-space: nowrap; }
-  .dates .dl { font-size: 8pt; color: #444; }
+  .dates .dl { font-size: 10.5pt; color: #444; }
   /* ── 農薬テーブル ── */
-  table { width: 100%; border-collapse: collapse; margin-bottom: 4px; table-layout: fixed; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 7px; table-layout: fixed; }
+  thead { display: table-header-group; }
   th {
     background: #ddd; border: 1px solid #888;
-    padding: 3px 6px; font-size: 8.5pt; text-align: center;
+    padding: 6px; font-size: 11pt; text-align: center;
   }
   td {
-    border: 1px solid #aaa; padding: 2px 6px;
-    font-size: 9pt; vertical-align: middle; height: 16px;
+    border: 1px solid #aaa; padding: 5px 8px;
+    font-size: 11.5pt; vertical-align: middle; height: 26px;
   }
   col.c1 { width: 33%; }
   col.c2 { width: 33%; }
   col.c3 { width: 17%; }
   col.c4 { width: 17%; }
   td:nth-child(3) { white-space: nowrap; }
-  .completed { font-weight: bold; font-size: 9pt; margin-bottom: 4px; }
+  .completed { font-weight: bold; font-size: 12pt; margin-bottom: 7px; }
   /* ── 免責文 ── */
   .footer-note {
-    border: 1px solid #aaa; padding: 4px 10px;
-    font-size: 7.5pt; line-height: 1.6; margin-bottom: 5px;
+    border: 1px solid #aaa; padding: 7px 12px;
+    font-size: 9.5pt; line-height: 1.7; margin-bottom: 8px;
   }
   /* ── 会社情報 ── */
-  .company-row { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 4px; }
-  .company { text-align: right; font-size: 8.5pt; line-height: 1.75; }
-  .line-qr-wrap { display: flex; align-items: center; gap: 8px; }
+  .company-row { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 6px; }
+  /* 下段は折り返さずに1行ずつ収める（電話番号が途中で切れないように） */
+  .company { text-align: right; font-size: 10.5pt; line-height: 1.8; white-space: nowrap; }
+  .company .nm { font-size: 12pt; font-weight: bold; }
+  .line-qr-wrap { display: flex; align-items: center; gap: 10px; }
   .line-qr-img { flex-shrink: 0; }
-  .line-qr-img img { width: 60px; height: 60px; display: block; }
-  .line-qr-text { font-size: 7.5pt; color: #000; line-height: 1.65; }
+  .line-qr-img img { width: 82px; height: 82px; display: block; }
+  .line-qr-text { font-size: 9pt; color: #000; line-height: 1.7; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -4266,8 +4269,10 @@ function printPestHistory() {
     </div>
   </div>
   <div class="company">
-    有限会社 佐竹農園　　和歌山市 島 201<br>
-    TEL 073-460-4832　　FAX 073-460-7569　　生産者直通 090-4767-0856
+    <span class="nm">有限会社 佐竹農園</span><br>
+    和歌山市 島 201<br>
+    TEL 073-460-4832　FAX 073-460-7569<br>
+    生産者直通 090-4767-0856
   </div>
 </div>
 

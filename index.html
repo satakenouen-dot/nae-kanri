@@ -70,6 +70,10 @@ body{
 .ev-tag.播種予定.overdue{background:#ffebee;color:#c62828;border-color:#c62828}
 .ev-tag.接ぎ木{background:var(--orange-l);color:var(--orange);border-color:var(--orange)}
 .ev-tag.定植{background:var(--orange-l);color:var(--orange);border-color:var(--orange)}
+/* 外注の入荷 */
+.ev-tag.入荷{background:var(--purple-l);color:var(--purple);border-color:var(--purple)}
+.ev-tag.入荷予定{background:#fff;color:var(--purple);border:1.5px solid var(--purple);border-left-width:3px;font-weight:700}
+.ev-tag.入荷予定.overdue{background:#ffebee;color:#c62828;border-color:#c62828}
 .ev-tag.出荷{background:var(--red-l);color:var(--red);border-color:var(--red)}
 .ev-tag.農薬{background:var(--purple-l);color:var(--purple);border-color:var(--purple)}
 .ev-tag.ベスト{background:#FFF8E1;color:#F57F17;border-color:#F9A825}
@@ -133,6 +137,9 @@ input[type=number]{-moz-appearance:textfield}
 .seed-done{background:#E8F5E9;color:#2E7D32;border-color:#2E7D32}
 .seed-todo{background:#FFF8E1;color:#E65100;border-color:#FFB300}
 .seed-done:active,.seed-todo:active{opacity:.7}
+.os-done{background:#F3E5F5;color:#6A1B9A;border-color:#6A1B9A}
+.os-todo{background:#FFEBEE;color:#c62828;border-color:#c62828}
+.os-done:active,.os-todo:active{opacity:.7}
 .cust-chip{flex-shrink:0;font-size:12px;font-weight:600;padding:5px 12px;border-radius:16px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;white-space:nowrap}
 .cust-chip.active{background:var(--green);border-color:var(--green);color:#fff}
 .status-tabs{display:flex;background:#fff;border-bottom:1px solid var(--border)}
@@ -142,6 +149,7 @@ input[type=number]{-moz-appearance:textfield}
 .status-tab:active{background:#f5f5f5}
 .status-tab[data-status="pending"].active{color:#e65100;border-bottom-color:#f9a825;background:#fffde7}
 .status-tab[data-status="growing"].active{color:#2e7d32;border-bottom-color:#388e3c;background:#e8f5e9}
+.status-tab[data-status="outsourced"].active{color:#6A1B9A;border-bottom-color:#6A1B9A;background:#F3E5F5}
 .status-tab[data-status="shipped"].active{color:#555;border-bottom-color:#9e9e9e;background:#f5f5f5}
 .settings-item{display:flex;align-items:center;gap:12px;padding:15px 16px;background:#fff;border-bottom:1px solid var(--border);cursor:pointer;border:none;width:100%;text-align:left;font-family:inherit;font-size:14px}
 .settings-item:active{background:var(--bg)}
@@ -162,6 +170,12 @@ input[type=number]{-moz-appearance:textfield}
 .ev-card.接ぎ木{background:var(--orange-l);border-color:var(--orange)}
 .ev-card.定植{background:var(--orange-l);border-color:var(--orange)}
 .ev-card.定植 .ev-card-type{color:var(--orange)}
+.ev-card.入荷{background:var(--purple-l);border-color:var(--purple)}
+.ev-card.入荷 .ev-card-type{color:var(--purple)}
+.ev-card.入荷予定{background:#fff;border:2px solid var(--purple);border-left-width:4px}
+.ev-card.入荷予定 .ev-card-type{color:var(--purple)}
+.ev-card.入荷予定.overdue{background:#ffebee;border-color:#c62828}
+.ev-card.入荷予定.overdue .ev-card-type{color:#c62828}
 .ev-card.出荷{background:var(--red-l);border-color:var(--red)}
 .ev-card.農薬{background:var(--purple-l);border-color:var(--purple)}
 .ev-card.ベスト{background:#FFF8E1;border-color:#F9A825}
@@ -252,6 +266,12 @@ input[type=number]{-moz-appearance:textfield}
   </div>
   <!-- 最終同期の表示 -->
   <div id="sync-status" style="font-size:10px;text-align:right;padding:2px 12px;background:#fff;color:var(--text2);border-bottom:1px solid var(--border)"></div>
+  <!-- 外注アラーム（未発注・入荷遅れ） -->
+  <div id="os-alarm" style="display:none;background:#6A1B9A;color:#fff;padding:9px 14px">
+    <div style="font-size:13px;font-weight:700">🏭 外注の発注・入荷を確認してください</div>
+    <div style="font-size:11px;opacity:.9;margin:1px 0 5px">タップするとその注文を開きます</div>
+    <div id="os-alarm-list" style="display:flex;flex-direction:column;gap:4px"></div>
+  </div>
   <!-- 種子未発注アラート -->
   <div id="seed-alert" style="display:none;background:#FFF8E1;border-bottom:2px solid #F9A825;padding:8px 14px;cursor:pointer">
     <div style="font-size:12px;font-weight:700;color:#E65100">🌱 種子未発注の品種</div>
@@ -276,6 +296,7 @@ input[type=number]{-moz-appearance:textfield}
       <div class="leg-item"><div class="leg-dot" style="background:var(--orange-l);border-color:var(--orange)"></div>接ぎ木・定植</div>
       <div class="leg-item"><div class="leg-dot" style="background:var(--red-l);border-color:var(--red)"></div>出荷</div>
       <div class="leg-item"><div class="leg-dot" style="background:var(--purple-l);border-color:var(--purple)"></div>農薬</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#fff;border:1.5px solid var(--purple);border-left-width:3px"></div>外注入荷</div>
     </div>
   </div>
   <button class="fab" id="btn-cal-add">＋</button>
@@ -297,6 +318,7 @@ input[type=number]{-moz-appearance:textfield}
   <div class="status-tabs">
     <button class="status-tab active" data-status="pending"><span class="st-label">🌾 播種前</span><span class="st-count" id="cnt-pending">0</span></button>
     <button class="status-tab" data-status="growing"><span class="st-label">🌱 在圃中</span><span class="st-count" id="cnt-growing">0</span></button>
+    <button class="status-tab" data-status="outsourced"><span class="st-label">🏭 外注</span><span class="st-count" id="cnt-outsourced">0</span></button>
     <button class="status-tab" data-status="shipped"><span class="st-label">📦 出荷済み</span><span class="st-count" id="cnt-shipped">0</span></button>
   </div>
   <!-- 注文主別ピックアップ -->
@@ -333,7 +355,49 @@ input[type=number]{-moz-appearance:textfield}
       </div>
     </div>
 
+    <!-- 外注の発注・入荷（外注品のときだけ表示） -->
+    <div class="form-section" id="outsource-section" style="display:none;border:2px solid #6A1B9A;background:#F3E5F5">
+      <div id="outsource-status" style="font-size:13px;font-weight:700;margin-bottom:8px;color:#6A1B9A">🏭 外注の発注・入荷</div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:700;font-size:14px;margin-bottom:8px">
+        <input type="checkbox" id="f-os-ordered" style="width:22px;height:22px;accent-color:#6A1B9A;flex-shrink:0">
+        🏭 外注先へ発注済み
+      </label>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">発注日</label>
+          <div style="display:flex;gap:4px">
+            <input class="form-input" id="f-os-order-date" type="date" style="flex:1;min-width:0">
+            <button type="button" id="btn-os-today" style="flex-shrink:0;padding:0 10px;border:1.5px solid #6A1B9A;background:#fff;color:#6A1B9A;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">今日</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">発注数量</label>
+          <input class="form-input" id="f-os-qty" type="text" placeholder="例：500">
+        </div>
+      </div>
+      <div id="f-os-qty-warn" style="font-size:12px;font-weight:700;color:#c62828;margin-top:6px;display:none"></div>
+      <div class="form-row" style="margin-top:10px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">入荷予定日</label>
+          <input class="form-input" id="f-os-eta" type="date">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">入荷日（届いた日）</label>
+          <input class="form-input" id="f-os-arrived" type="date">
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:10px;margin-bottom:0">
+        <label class="form-label">外注メモ（先方の注文番号など）</label>
+        <input class="form-input" id="f-os-memo" type="text" placeholder="例：先方No.1234">
+      </div>
+    </div>
+
     <div class="form-section">
+      <!-- 外注品かどうか（生産の流れが変わるので最初に決める） -->
+      <label style="display:flex;align-items:center;gap:12px;padding:8px 4px 12px;cursor:pointer;border-bottom:1px solid var(--border);margin-bottom:12px">
+        <input type="checkbox" id="f-outsourced" style="width:22px;height:22px;accent-color:#6A1B9A;flex-shrink:0">
+        <span style="font-size:14px;font-weight:700;color:#6A1B9A">🏭 外注品（自社で播種しない）</span>
+      </label>
       <div class="form-group">
         <label class="form-label">注文入力日</label>
         <input class="form-input" id="f-orderDate" type="date">
@@ -714,6 +778,11 @@ input[type=number]{-moz-appearance:textfield}
       <span>注文一覧を印刷（A4横）</span>
       <span style="margin-left:auto;color:var(--text2)">›</span>
     </button>
+    <button class="settings-item" id="btn-print-outsource">
+      <span class="settings-icon">🏭</span>
+      <span>外注発注書を印刷（未発注分）</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
   </div>
 </div>
 
@@ -973,6 +1042,7 @@ function showScreen(id) {
 // ── 注文フォームの未保存検知 & 下書き自動保存 ──────────
 const ORDER_FIELDS = [
   'f-sow-actual','f-sow-trays',
+  'f-outsourced','f-os-ordered','f-os-order-date','f-os-qty','f-os-eta','f-os-arrived','f-os-memo',
   'f-orderDate','f-customer','f-phone','f-type-sel','f-type','f-crop',
   'f-variety-single','f-variety-scion','f-variety-stock','f-qty','f-price',
   'f-delivery','f-sow','f-graft','f-ship','f-best','f-pot','f-memo',
@@ -2346,11 +2416,37 @@ function isGraft(type) { return type ? /接ぎ|接木/i.test(type) : false; }
 function isSown(o) { return !!(o && o.sowDateActual); }
 // 学習・農薬履歴などに使う播種日（実績があれば実績、なければ予定）
 function sowDateOf(o) { return (o && (o.sowDateActual || o.sowDate)) || ''; }
-// 予定日を過ぎたのに実際の播種日が未入力（出荷済みは除く）
+// 予定日を過ぎたのに実際の播種日が未入力（出荷済み・外注品は除く）
 function isSowOverdue(o, todayStr) {
   if (!o || !o.sowDate || o.sowDateActual) return false;
+  if (isOutsourced(o)) return false;              // 外注品は自社で播かない
   if (o.shipDate && o.shipDate <= todayStr) return false;
   return o.sowDate < todayStr;
+}
+
+// ── 外注品 ────────────────────────────────────────────
+function isOutsourced(o) { return !!(o && o.outsourced); }
+// 外注先へまだ発注していない（出荷済みは除く）
+function isOutsourceUnordered(o, todayStr) {
+  if (!isOutsourced(o) || o.outsourceOrdered) return false;
+  return !(o.shipDate && o.shipDate <= todayStr);
+}
+// 発注済みだが入荷予定日を過ぎても届いていない
+function isOutsourceLate(o, todayStr) {
+  if (!isOutsourced(o) || !o.outsourceOrdered || o.outsourceArrivedDate) return false;
+  if (o.shipDate && o.shipDate <= todayStr) return false;
+  return !!o.outsourceEtaDate && o.outsourceEtaDate < todayStr;
+}
+// 数量の文字列から数値を取り出す（"1200+400"→1600、"10枚"→10）
+function qtyNum(s) {
+  const m = String(s || '').match(/\d+(?:\.\d+)?/g);
+  return m ? m.reduce((a, b) => a + parseFloat(b), 0) : null;
+}
+// ⑥ 受注数量と発注数量の食い違い
+function outsourceQtyMismatch(o) {
+  if (!isOutsourced(o) || !o.outsourceQty) return false;
+  const a = qtyNum(o.qty), b = qtyNum(o.outsourceQty);
+  return a !== null && b !== null && a !== b;
 }
 
 // ── ベスト出荷日からの学習統計を再計算 ────────────────
@@ -2542,9 +2638,47 @@ function renderCalendar() {
     }
   }
 
+  // ── 外注アラーム（未発注・入荷遅れ・数量違い）──
+  const osAlarm = document.getElementById('os-alarm');
+  if (osAlarm) {
+    const unordered = orders.filter(o => isOutsourceUnordered(o, todayStr))
+      .sort((a, b) => (a.delivery || '9999').localeCompare(b.delivery || '9999'));
+    const late = orders.filter(o => isOutsourceLate(o, todayStr))
+      .sort((a, b) => (a.outsourceEtaDate || '').localeCompare(b.outsourceEtaDate || ''));
+    const mismatch = orders.filter(o => outsourceQtyMismatch(o) &&
+      !(o.shipDate && o.shipDate <= todayStr));
+    const listEl = document.getElementById('os-alarm-list');
+    listEl.innerHTML = '';
+    const addRow = (o, label, color) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.style.cssText = 'text-align:left;background:#fff;color:' + color + ';border:none;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;justify-content:space-between;gap:8px';
+      row.innerHTML = '<span>' + (o.variety || o.crop || '') + (o.type ? '（' + o.type + '）' : '') +
+        (o.customer ? '　' + o.customer : '') + '</span>' +
+        '<span style="white-space:nowrap">' + label + ' ›</span>';
+      row.onclick = () => openOrderForm(o);
+      listEl.appendChild(row);
+    };
+    unordered.forEach(o => {
+      const days = o.delivery
+        ? Math.round((parseLocalDate(o.delivery) - parseLocalDate(todayStr)) / 86400000) : null;
+      const urgent = days !== null && days <= 30;
+      addRow(o, '未発注・納期' + fmtJPY(o.delivery) +
+        (days !== null ? (days >= 0 ? '（あと' + days + '日）' : '（' + (-days) + '日超過）') : ''),
+        urgent ? '#c62828' : '#6A1B9A');
+    });
+    late.forEach(o => {
+      const d = Math.round((parseLocalDate(todayStr) - parseLocalDate(o.outsourceEtaDate)) / 86400000);
+      addRow(o, '未入荷・予定' + fmtJPY(o.outsourceEtaDate) + '（' + d + '日超過）', '#c62828');
+    });
+    mismatch.forEach(o => addRow(o, '数量違い 受注' + (o.qty || '—') + ' / 発注' + (o.outsourceQty || '—'), '#E65100'));
+    osAlarm.style.display = listEl.children.length ? '' : 'none';
+  }
+
   // 種子未発注アラート（未播種・未出荷の注文が対象）
   const unprepared = orders.filter(o =>
     !o.seedOrdered &&
+    !isOutsourced(o) &&                              // 外注品は自社の種子が不要
     !(o.shipDate && o.shipDate <= todayStr) &&
     !isSown(o)
   );
@@ -2572,15 +2706,25 @@ function renderCalendar() {
 
   for (const o of orders) {
     const lbl = o.variety || o.crop;   // 品種名を優先表示（未入力時は作物名）
-    if (o.sowDateActual) {
-      // 実際に播いた日：通常表示
-      addEv(o.sowDateActual, { type: '播種', label: lbl, id: o.id, order: o });
-    } else if (o.sowDate) {
-      // 播種予定日：枠付きで目立たせる（予定を過ぎていれば赤枠）
-      addEv(o.sowDate, { type: '播種予定', label: lbl, id: o.id, order: o,
-                         overdue: isSowOverdue(o, todayStr) });
+    if (isOutsourced(o)) {
+      // 外注品：播種ではなく入荷予定を表示
+      if (o.outsourceArrivedDate) {
+        addEv(o.outsourceArrivedDate, { type: '入荷', label: lbl, id: o.id, order: o });
+      } else if (o.outsourceEtaDate) {
+        addEv(o.outsourceEtaDate, { type: '入荷予定', label: lbl, id: o.id, order: o,
+                                    overdue: isOutsourceLate(o, todayStr) });
+      }
+    } else {
+      if (o.sowDateActual) {
+        // 実際に播いた日：通常表示
+        addEv(o.sowDateActual, { type: '播種', label: lbl, id: o.id, order: o });
+      } else if (o.sowDate) {
+        // 播種予定日：枠付きで目立たせる（予定を過ぎていれば赤枠）
+        addEv(o.sowDate, { type: '播種予定', label: lbl, id: o.id, order: o,
+                           overdue: isSowOverdue(o, todayStr) });
+      }
+      if (o.graftDate) addEv(o.graftDate, { type: isGraft(o.type) ? '接ぎ木' : '定植', label: lbl, id: o.id, order: o });
     }
-    if (o.graftDate) addEv(o.graftDate, { type: isGraft(o.type) ? '接ぎ木' : '定植', label: lbl, id: o.id, order: o });
     addEv(o.shipDate || o.delivery,     { type: '出荷',  label: lbl, id: o.id, order: o });
   }
   for (const p of pestLogs) {
@@ -2608,15 +2752,16 @@ function renderCalendar() {
 
     const evs = dayMap[d] || [];
     // 予定のある日（まだ播いていない）を強調。予定超過は赤で強調
-    if (evs.some(e => e.type === '播種予定')) cell.classList.add('has-sow');
-    if (evs.some(e => e.overdue))            cell.classList.add('sow-overdue');
-    // 予定超過・播種予定を先頭に並べて見落としを防ぐ
+    const isPlan = e => e.type === '播種予定' || e.type === '入荷予定';
+    if (evs.some(isPlan))         cell.classList.add('has-sow');
+    if (evs.some(e => e.overdue)) cell.classList.add('sow-overdue');
+    // 予定超過・予定を先頭に並べて見落としを防ぐ
     const ordered = [...evs].sort((a, b) =>
-      (b.overdue ? 2 : b.type === '播種予定' ? 1 : 0) - (a.overdue ? 2 : a.type === '播種予定' ? 1 : 0));
+      (b.overdue ? 2 : isPlan(b) ? 1 : 0) - (a.overdue ? 2 : isPlan(a) ? 1 : 0));
     ordered.slice(0, 3).forEach(ev => {
       const tag = document.createElement('div');
       tag.className = `ev-tag ${ev.type}${ev.overdue ? ' overdue' : ''}`;
-      tag.textContent = ev.type === '播種予定'
+      tag.textContent = isPlan(ev)
         ? `${ev.overdue ? '⚠' : '予'} ${ev.label}`
         : `${ev.type[0]} ${ev.label}`;
       cell.appendChild(tag);
@@ -2708,6 +2853,15 @@ function openOrderForm(order = null) {
   document.getElementById('f-sow-trays').value  = order?.sowTrays ?? '';
   document.getElementById('sow-actual-section').style.display = order ? '' : 'none';
   updateSowActualStatus();
+  // 外注品の情報
+  document.getElementById('f-outsourced').checked      = order?.outsourced ?? false;
+  document.getElementById('f-os-ordered').checked      = order?.outsourceOrdered ?? false;
+  document.getElementById('f-os-order-date').value     = order?.outsourceOrderDate ?? '';
+  document.getElementById('f-os-qty').value            = order?.outsourceQty ?? '';
+  document.getElementById('f-os-eta').value            = order?.outsourceEtaDate ?? '';
+  document.getElementById('f-os-arrived').value        = order?.outsourceArrivedDate ?? '';
+  document.getElementById('f-os-memo').value           = order?.outsourceMemo ?? '';
+  updateOutsourceUI();
   document.getElementById('f-graft').value    = order?.graftDate ?? '';
   document.getElementById('f-ship').value     = order?.shipDate ?? '';
   document.getElementById('f-best').value     = order?.bestShipDate ?? '';
@@ -2750,6 +2904,67 @@ function openOrderForm(order = null) {
   showScreen('screen-order-form');
   markOrderFormSaved();   // この時点を「未編集」の基準にする
 }
+
+// ── 外注品：表示の切り替えと数量チェック ────────────────
+function updateOutsourceUI() {
+  const os  = document.getElementById('f-outsourced').checked;
+  const sec = document.getElementById('outsource-section');
+  const sow = document.getElementById('sow-actual-section');
+  const editing = !!editingOrderId;
+  // 外注品なら播種実績を隠し、外注欄を出す
+  sec.style.display = (os && editing) ? '' : 'none';
+  if (sow) sow.style.display = (!os && editing) ? '' : 'none';
+  // 播種予定日は外注品では使わない
+  const sowRow = document.getElementById('f-sow');
+  if (sowRow && sowRow.closest('.form-group')) {
+    sowRow.closest('.form-group').style.display = os ? 'none' : '';
+  }
+  if (!os) return;
+
+  const ordered = document.getElementById('f-os-ordered').checked;
+  const eta     = document.getElementById('f-os-eta').value;
+  const arrived = document.getElementById('f-os-arrived').value;
+  const el = document.getElementById('outsource-status');
+  const td = today();
+  if (arrived) {
+    el.textContent = '✅ 入荷済み（' + fmtJP(arrived) + '）';
+    el.style.color = '#2e7d32';
+    sec.style.borderColor = '#2e7d32'; sec.style.background = '#e8f5e9';
+  } else if (!ordered) {
+    el.textContent = '⚠️ まだ外注先へ発注していません';
+    el.style.color = '#c62828';
+    sec.style.borderColor = '#c62828'; sec.style.background = '#ffebee';
+  } else if (eta && eta < td) {
+    el.textContent = '⚠️ 入荷予定日（' + fmtJP(eta) + '）を過ぎています';
+    el.style.color = '#c62828';
+    sec.style.borderColor = '#c62828'; sec.style.background = '#ffebee';
+  } else {
+    el.textContent = '🏭 発注済み' + (eta ? '（入荷予定 ' + fmtJP(eta) + '）' : '');
+    el.style.color = '#6A1B9A';
+    sec.style.borderColor = '#6A1B9A'; sec.style.background = '#F3E5F5';
+  }
+  // ⑥ 受注数量と発注数量の食い違いを警告
+  const warn = document.getElementById('f-os-qty-warn');
+  const a = qtyNum(document.getElementById('f-qty').value);
+  const b = qtyNum(document.getElementById('f-os-qty').value);
+  if (a !== null && b !== null && a !== b) {
+    warn.textContent = '⚠️ 受注数量（' + document.getElementById('f-qty').value +
+                       '）と発注数量（' + document.getElementById('f-os-qty').value + '）が違います';
+    warn.style.display = '';
+  } else {
+    warn.style.display = 'none';
+  }
+}
+['f-outsourced','f-os-ordered','f-os-eta','f-os-arrived','f-os-qty','f-qty'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) { el.addEventListener('change', updateOutsourceUI); el.addEventListener('input', updateOutsourceUI); }
+});
+document.getElementById('btn-os-today').onclick = () => {
+  document.getElementById('f-os-order-date').value = today();
+  document.getElementById('f-os-ordered').checked = true;
+  updateOutsourceUI();
+  scheduleDraftSave();
+};
 
 // 起動時の播種忘れアラーム（ポップアップ）
 function alertOverdueSowing() {
@@ -3157,6 +3372,13 @@ document.getElementById('btn-order-submit').onclick = async () => {
     sowDate:   document.getElementById('f-sow').value,
     sowDateActual: document.getElementById('f-sow-actual').value,
     sowTrays:      document.getElementById('f-sow-trays').value.trim(),
+    outsourced:          document.getElementById('f-outsourced').checked,
+    outsourceOrdered:    document.getElementById('f-os-ordered').checked,
+    outsourceOrderDate:  document.getElementById('f-os-order-date').value,
+    outsourceQty:        document.getElementById('f-os-qty').value.trim(),
+    outsourceEtaDate:    document.getElementById('f-os-eta').value,
+    outsourceArrivedDate:document.getElementById('f-os-arrived').value,
+    outsourceMemo:       document.getElementById('f-os-memo').value.trim(),
     graftDate: document.getElementById('f-graft').value,
     shipDate:  document.getElementById('f-ship').value,
     bestShipDate: document.getElementById('f-best').value,
@@ -3289,6 +3511,7 @@ function renderOrderList() {
   // 状態分類
   function orderStatus(o) {
     if (o.shipDate && o.shipDate <= todayStr) return 'shipped';   // 出荷済み
+    if (isOutsourced(o)) return 'outsourced';   // 外注品は自社の播種前／在圃中に混ぜない
     if (isSown(o)) return 'growing';   // 在圃中（実際に播種した注文だけ。予定日が過ぎただけでは移さない）
     return 'pending';                                              // 播種前
   }
@@ -3300,11 +3523,16 @@ function renderOrderList() {
   const pending  = filtered.filter(o => orderStatus(o) === 'pending') .sort((a,b)=>(a.sowDate||'9999').localeCompare(b.sowDate||'9999'));
   const growing  = filtered.filter(o => orderStatus(o) === 'growing') .sort((a,b)=>(a.delivery||'').localeCompare(b.delivery||''));
   const shipped  = filtered.filter(o => orderStatus(o) === 'shipped') .sort((a,b)=>(b.shipDate||'').localeCompare(a.shipDate||''));
+  // 外注：未発注を先頭に、納期の早い順
+  const outsourced = filtered.filter(o => orderStatus(o) === 'outsourced')
+    .sort((a, b) => ((a.outsourceOrdered ? 1 : 0) - (b.outsourceOrdered ? 1 : 0)) ||
+                    (a.delivery || '9999').localeCompare(b.delivery || '9999'));
 
   // タブの件数表示を更新
   document.getElementById('cnt-pending').textContent = pending.length;
   document.getElementById('cnt-growing').textContent = growing.length;
   document.getElementById('cnt-shipped').textContent = shipped.length;
+  document.getElementById('cnt-outsourced').textContent = outsourced.length;
   document.querySelectorAll('.status-tab').forEach(t =>
     t.classList.toggle('active', t.dataset.status === statusFilter));
 
@@ -3315,6 +3543,7 @@ function renderOrderList() {
     pending: { bg:'#fffde7', border:'#f9a825', iconBg:'#fff3b0', icon:'🌾', label:'播種前', labelColor:'#e65100' },
     growing: { bg:'#e8f5e9', border:'#388e3c', iconBg:'#c8e6c9', icon:'🌱', label:'在圃中', labelColor:'#2e7d32' },
     shipped: { bg:'#f9f9f9', border:'#e0e0e0', iconBg:'#eeeeee', icon:'📦', label:'出荷済み', labelColor:'#757575' },
+    outsourced: { bg:'#F3E5F5', border:'#6A1B9A', iconBg:'#E1BEE7', icon:'🏭', label:'外注', labelColor:'#6A1B9A' },
   };
 
   function addItems(list, status) {
@@ -3323,29 +3552,50 @@ function renderOrderList() {
       const div = document.createElement('div');
       div.className = 'list-item';
       div.style.cssText = `background:${s.bg};border-left:4px solid ${s.border};`;
-      const seedBadge = o.seedOrdered
-        ? `<span class="seed-badge seed-done">🌱 種子発注済</span>`
-        : `<span class="seed-badge seed-todo">🌱 種子未発注</span>`;
+      const os = isOutsourced(o);
+      // 外注品は「種子」ではなく「外注の発注状況」を出す
+      const seedBadge = os
+        ? (o.outsourceOrdered
+            ? `<span class="seed-badge os-done">🏭 発注済</span>`
+            : `<span class="seed-badge os-todo">🏭 外注未発注</span>`)
+        : (o.seedOrdered
+            ? `<span class="seed-badge seed-done">🌱 種子発注済</span>`
+            : `<span class="seed-badge seed-todo">🌱 種子未発注</span>`);
+      // 2行目：自社品は播種、外注品は入荷の状況
+      const line2 = os
+        ? (o.outsourceArrivedDate
+            ? '入荷：' + fmtJPY(o.outsourceArrivedDate)
+            : '入荷予定：' + (fmtJPY(o.outsourceEtaDate) || '未設定') +
+              (isOutsourceLate(o, todayStr) ? ' <span style="color:#c62828;font-weight:700">⚠️未入荷</span>' : ''))
+          + (outsourceQtyMismatch(o) ? ' <span style="color:#E65100;font-weight:700">⚠️数量違い</span>' : '')
+        : (o.sowDateActual
+            ? '播種：' + fmtJPY(o.sowDateActual) + (o.sowTrays ? '（' + o.sowTrays + '枚）' : '')
+            : '播種予定：' + (fmtJPY(o.sowDate) || '未設定') +
+              (isSowOverdue(o, todayStr) ? ' <span style="color:#c62828;font-weight:700">⚠️未播種</span>' : ''));
       div.innerHTML = `
-        <div class="list-icon" style="background:${s.iconBg}">${isGraft(o.type) ? '✂️' : s.icon}</div>
+        <div class="list-icon" style="background:${s.iconBg}">${os ? '🏭' : (isGraft(o.type) ? '✂️' : s.icon)}</div>
         <div class="list-body">
           <div class="list-title">${o.crop}${o.variety ? ' / ' + o.variety : ''}</div>
           <div class="list-sub">納品：${fmtJPY(o.delivery)}${o.qty ? '　' + o.qty : ''}${o.customer ? '　' + o.customer : ''}</div>
-          <div class="list-sub">${o.sowDateActual
-              ? '播種：' + fmtJPY(o.sowDateActual) + (o.sowTrays ? '（' + o.sowTrays + '枚）' : '')
-              : '播種予定：' + (fmtJPY(o.sowDate) || '未設定') +
-                (isSowOverdue(o, todayStr) ? ' <span style="color:#c62828;font-weight:700">⚠️未播種</span>' : '')
-            }${status==='shipped' ? '　出荷：'+fmtJPY(o.shipDate) : ''}</div>
+          <div class="list-sub">${line2}${status==='shipped' ? '　出荷：'+fmtJPY(o.shipDate) : ''}</div>
           <div style="margin-top:5px">${seedBadge}</div>
         </div>
         <div class="list-arrow">›</div>`;
-      // 種子バッジをタップ → 発注済み/未発注をその場で切り替え
+      // バッジをタップ → 発注済み/未発注をその場で切り替え
       div.querySelector('.seed-badge').addEventListener('click', (e) => {
         e.stopPropagation();
         const idx = orders.findIndex(x => x.id === o.id);
         if (idx < 0) return;
-        orders[idx].seedOrdered = !orders[idx].seedOrdered;
+        if (os) {
+          const now = !orders[idx].outsourceOrdered;
+          orders[idx].outsourceOrdered = now;
+          if (now && !orders[idx].outsourceOrderDate) orders[idx].outsourceOrderDate = today();
+        } else {
+          orders[idx].seedOrdered = !orders[idx].seedOrdered;
+        }
+        orders[idx].updatedAt = new Date().toISOString();
         saveOrders();
+        renderCalendar();
         renderOrderList();
       });
       div.onclick = () => openOrderForm(o);
@@ -3354,7 +3604,7 @@ function renderOrderList() {
   }
 
   // 選択中のタブの注文だけを表示
-  const groups = { pending, growing, shipped };
+  const groups = { pending, growing, shipped, outsourced };
   const current = groups[statusFilter] || [];
   if (current.length) {
     addItems(current, statusFilter);
@@ -3379,6 +3629,7 @@ function getInProgressOrders(dateStr) {
   // 播種済み・未出荷の注文を返す（登録作物・未登録作物で分類）
   const registered = [], unregistered = [];
   for (const o of orders) {
+    if (isOutsourced(o)) continue;   // 外注品は自社で栽培していないので農薬を紐づけない
     const _sd = sowDateOf(o);
     if (!_sd || _sd > dateStr) continue;                      // 未播種
     if (o.shipDate && o.shipDate < dateStr) continue;         // 出荷済み
@@ -4390,6 +4641,85 @@ function printOrderList() {
   win.document.write(html);
   win.document.close();
 }
+// ── 外注発注書 印刷（A4縦・未発注分をまとめて）────────────
+function printOutsourceOrder() {
+  const _td = today();
+  const list = orders
+    .filter(o => isOutsourceUnordered(o, _td))
+    .sort((a, b) => (a.delivery || '9999').localeCompare(b.delivery || '9999'));
+  if (!list.length) { alert('未発注の外注品はありません'); return; }
+
+  const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const rows = list.map((o, i) => `<tr>
+      <td class="c">${i + 1}</td>
+      <td>${esc(o.crop)}</td>
+      <td>${esc(o.variety)}</td>
+      <td>${esc(o.type)}</td>
+      <td class="r">${esc(o.outsourceQty || o.qty)}</td>
+      <td class="c">${fmtJPFull(o.delivery)}</td>
+      <td>${esc(o.outsourceMemo)}</td>
+    </tr>`).join('');
+  const blanks = Array.from({ length: Math.max(0, 8 - list.length) },
+    () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('');
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>苗 発注書</title>
+<style>
+  @page { size: A4 portrait; margin: 15mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "ＭＳ Ｐゴシック","MS PGothic",sans-serif; margin: 0; color: #000; font-size: 11pt; }
+  h1 { text-align: center; font-size: 19pt; letter-spacing: 8px; margin: 0 0 10px; }
+  .top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+  .to { font-size: 13pt; font-weight: bold; border-bottom: 1px solid #000; padding: 0 30px 2px 6px; }
+  .date { font-size: 11pt; }
+  .lead { margin: 10px 0 8px; font-size: 11.5pt; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 2px solid #000; margin-bottom: 12px; }
+  th, td { border: 1px solid #000; padding: 6px 5px; font-size: 10.5pt; height: 30px; vertical-align: middle; word-break: break-all; }
+  th { background: #eee; text-align: center; font-weight: bold; }
+  td.c { text-align: center; white-space: nowrap; }
+  td.r { text-align: right; white-space: nowrap; }
+  tr { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  .note { border: 1px solid #000; padding: 8px 12px; font-size: 10pt; line-height: 1.8; margin-bottom: 14px; }
+  .company { text-align: right; font-size: 10.5pt; line-height: 1.85; white-space: nowrap; }
+  .company .nm { font-size: 12.5pt; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>苗　発　注　書</h1>
+<div class="top">
+  <div><span class="to">　　　　　　　　　　</span> 御中</div>
+  <div class="date">発注日：${fmtJPFull(_td)}</div>
+</div>
+<div class="lead">下記のとおり発注いたします。ご手配をお願いいたします。</div>
+<table>
+  <colgroup>
+    <col style="width:7%"><col style="width:14%"><col style="width:26%"><col style="width:15%">
+    <col style="width:12%"><col style="width:16%"><col style="width:10%">
+  </colgroup>
+  <thead>
+    <tr><th>No</th><th>品目</th><th>品種</th><th>規格</th><th>数量</th><th>希望納期</th><th>備考</th></tr>
+  </thead>
+  <tbody>${rows}${blanks}</tbody>
+</table>
+<div class="note">
+  ・納期が変更になる場合は、お手数ですが事前にご連絡ください。<br>
+  ・数量・規格に変更が生じる場合も、事前にご一報をお願いいたします。
+</div>
+<div class="company">
+  <span class="nm">有限会社 佐竹農園</span><br>
+  和歌山市 島 201<br>
+  TEL 073-460-4832　FAX 073-460-7569<br>
+  生産者直通 090-4767-0856
+</div>
+<script>window.onload = () => { window.print(); }<\/script>
+</body></html>`;
+  const win = window.open('', '_blank', 'width=820,height=1000');
+  win.document.write(html);
+  win.document.close();
+}
+document.getElementById('btn-print-outsource').onclick = printOutsourceOrder;
+
 document.getElementById('btn-print-orders').onclick   = printOrderList;
 document.getElementById('btn-print-orders-h').onclick = printOrderList;
 

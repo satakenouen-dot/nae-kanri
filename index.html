@@ -375,7 +375,7 @@ input[type=number]{-moz-appearance:textfield}
           <input class="form-input" id="f-os-qty" type="text" placeholder="例：500">
         </div>
       </div>
-      <div id="f-os-qty-warn" style="font-size:12px;font-weight:700;color:#c62828;margin-top:6px;display:none"></div>
+      <div id="f-os-qty-warn" style="font-size:11px;color:#6A1B9A;margin-top:6px;display:none"></div>
       <div class="form-row" style="margin-top:10px">
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">入荷予定日</label>
@@ -2638,15 +2638,14 @@ function renderCalendar() {
     }
   }
 
-  // ── 外注アラーム（未発注・入荷遅れ・数量違い）──
+  // ── 外注アラーム（未発注・入荷遅れ）──
+  // ※数量の違いは通常のことなので、保存時に1度確認するだけにしてここでは出さない
   const osAlarm = document.getElementById('os-alarm');
   if (osAlarm) {
     const unordered = orders.filter(o => isOutsourceUnordered(o, todayStr))
       .sort((a, b) => (a.delivery || '9999').localeCompare(b.delivery || '9999'));
     const late = orders.filter(o => isOutsourceLate(o, todayStr))
       .sort((a, b) => (a.outsourceEtaDate || '').localeCompare(b.outsourceEtaDate || ''));
-    const mismatch = orders.filter(o => outsourceQtyMismatch(o) &&
-      !(o.shipDate && o.shipDate <= todayStr));
     const listEl = document.getElementById('os-alarm-list');
     listEl.innerHTML = '';
     const addRow = (o, label, color) => {
@@ -2671,7 +2670,6 @@ function renderCalendar() {
       const d = Math.round((parseLocalDate(todayStr) - parseLocalDate(o.outsourceEtaDate)) / 86400000);
       addRow(o, '未入荷・予定' + fmtJPY(o.outsourceEtaDate) + '（' + d + '日超過）', '#c62828');
     });
-    mismatch.forEach(o => addRow(o, '数量違い 受注' + (o.qty || '—') + ' / 発注' + (o.outsourceQty || '—'), '#E65100'));
     osAlarm.style.display = listEl.children.length ? '' : 'none';
   }
 
@@ -2943,13 +2941,14 @@ function updateOutsourceUI() {
     el.style.color = '#6A1B9A';
     sec.style.borderColor = '#6A1B9A'; sec.style.background = '#F3E5F5';
   }
-  // ⑥ 受注数量と発注数量の食い違いを警告
+  // 受注数量と発注数量の差は通常のことなので、参考として差分だけ控えめに表示する
   const warn = document.getElementById('f-os-qty-warn');
   const a = qtyNum(document.getElementById('f-qty').value);
   const b = qtyNum(document.getElementById('f-os-qty').value);
   if (a !== null && b !== null && a !== b) {
-    warn.textContent = '⚠️ 受注数量（' + document.getElementById('f-qty').value +
-                       '）と発注数量（' + document.getElementById('f-os-qty').value + '）が違います';
+    const diff = b - a;
+    warn.textContent = '受注 ' + a + ' / 発注 ' + b +
+                       '（' + (diff > 0 ? '+' + diff : diff) + '）';
     warn.style.display = '';
   } else {
     warn.style.display = 'none';
@@ -3352,6 +3351,24 @@ document.getElementById('btn-order-submit').onclick = async () => {
     }
   }
 
+  // 外注の数量差は1度だけ確認する（違うのが普通なので、以降は何も出さない）
+  let qtyConfirmed = (editingOrderId
+    ? !!orders.find(o => o.id === editingOrderId)?.outsourceQtyConfirmed : false);
+  if (document.getElementById('f-outsourced').checked && !qtyConfirmed) {
+    const _a = qtyNum(document.getElementById('f-qty').value);
+    const _b = qtyNum(document.getElementById('f-os-qty').value);
+    if (_a !== null && _b !== null && _a !== _b) {
+      const ok = confirm(
+        '受注数量と外注への発注数量が違います。\n\n' +
+        '　受注：' + document.getElementById('f-qty').value + '\n' +
+        '　発注：' + document.getElementById('f-os-qty').value + '\n\n' +
+        'このまま保存してよろしいですか？\n（この確認は次回から表示されません）'
+      );
+      if (!ok) return;
+    }
+    qtyConfirmed = true;   // 一度確認したら以後は聞かない
+  }
+
   const btn = document.getElementById('btn-order-submit');
   btn.disabled = true; btn.textContent = '保存中…';
 
@@ -3379,6 +3396,7 @@ document.getElementById('btn-order-submit').onclick = async () => {
     outsourceEtaDate:    document.getElementById('f-os-eta').value,
     outsourceArrivedDate:document.getElementById('f-os-arrived').value,
     outsourceMemo:       document.getElementById('f-os-memo').value.trim(),
+    outsourceQtyConfirmed: qtyConfirmed,   // 数量差を確認済み（再確認しない）
     graftDate: document.getElementById('f-graft').value,
     shipDate:  document.getElementById('f-ship').value,
     bestShipDate: document.getElementById('f-best').value,
@@ -3567,7 +3585,7 @@ function renderOrderList() {
             ? '入荷：' + fmtJPY(o.outsourceArrivedDate)
             : '入荷予定：' + (fmtJPY(o.outsourceEtaDate) || '未設定') +
               (isOutsourceLate(o, todayStr) ? ' <span style="color:#c62828;font-weight:700">⚠️未入荷</span>' : ''))
-          + (outsourceQtyMismatch(o) ? ' <span style="color:#E65100;font-weight:700">⚠️数量違い</span>' : '')
+          + (o.outsourceQty ? '　発注' + o.outsourceQty : '')
         : (o.sowDateActual
             ? '播種：' + fmtJPY(o.sowDateActual) + (o.sowTrays ? '（' + o.sowTrays + '枚）' : '')
             : '播種予定：' + (fmtJPY(o.sowDate) || '未設定') +

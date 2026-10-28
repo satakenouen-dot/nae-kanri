@@ -1241,9 +1241,9 @@ function initApp() {
     renderCalendar();
     showScreen('screen-calendar');
 
-    // 起動時：前回チェックから1時間以上経過していたら復元バナーを表示
-    const _lastCheck = lsGet('nae-last-restore-check', 0);
-    if (Date.now() - _lastCheck > 60 * 60 * 1000) {
+    // 起動時：最後に同期してから10分以上あいていれば取得バナーを出す
+    // （スマホはアプリを開くたびに新しいセッションになるので、ここで必ず気付けるようにする）
+    if (Date.now() - lsGet('nae-last-sync', 0) > 10 * 60 * 1000) {
       showGdriveRestoreBanner();
     }
     // ⑵ 保存されずに終わった入力があれば復元を促す
@@ -1595,6 +1595,7 @@ function initGdrive() {
         else if (gdrivePendingAction === 'restore') doGdriveRestore();
         else if (gdrivePendingAction === 'exitBackup') doExitBackup();
         else if (gdrivePendingAction === 'tidy') doGdriveTidy();
+        else if (gdrivePendingAction === 'pullLatest') pullLatestFromDrive();
         else if (gdrivePendingAction === 'photo' && pendingPhotoCtx) {
           const ctx = pendingPhotoCtx;
           pendingPhotoCtx = null;
@@ -1771,10 +1772,10 @@ async function doGdriveRestore() {
 const SYNC_CHECK_INTERVAL = 60 * 60 * 1000;   // 1時間
 let syncChecking = false;
 
-async function checkRemoteUpdate() {
+async function checkRemoteUpdate(force) {
   if (syncChecking || !gdriveAccessToken) return;
   const last = lsGet('nae-last-sync-check', 0);
-  if (Date.now() - last < SYNC_CHECK_INTERVAL) return;   // 1時間経つまで問い合わせない
+  if (!force && Date.now() - last < SYNC_CHECK_INTERVAL) return;   // 通常は1時間あけて問い合わせる
   syncChecking = true;
   try {
     const files = await listBackupFiles();
@@ -1825,28 +1826,60 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('focus', checkRemoteUpdate);
 
-// 起動時復元バナー
+// 起動時復元バナー（アプリを開くたびに出し、1タップで最新を取り込めるようにする）
 function showGdriveRestoreBanner() {
   const banner = document.getElementById('gdrive-restore-banner');
   if (!banner) return;
+  const last = lsGet('nae-last-sync', 0);
+  document.getElementById('banner-title').textContent = 'Googleドライブから最新データを取得';
+  document.getElementById('banner-sub').textContent = last
+    ? '前回の同期：' + fmtJST(new Date(last).toISOString()) + '　他の端末の入力を取り込めます'
+    : 'スマホ・PC間でデータを同期できます';
+  document.getElementById('btn-restore-banner').textContent = '取得する';
   banner.style.display = 'flex';
 
   document.getElementById('btn-restore-banner').onclick = () => {
     banner.style.display = 'none';
     lsSet('nae-last-restore-check', Date.now());
-    if (!gdriveTokenClient) {
-      alert('Google APIの初期化中です。少し待ってから再度お試しください。');
-      return;
-    }
-    gdrivePendingAction = 'restore';
-    if (gdriveAccessToken) doGdriveRestore();
-    else gdriveTokenClient.requestAccessToken();
+    pullLatestFromDrive();
   };
 
   document.getElementById('btn-restore-banner-close').onclick = () => {
     banner.style.display = 'none';
-    lsSet('nae-last-restore-check', Date.now()); // スキップしても1時間は出さない
+    lsSet('nae-last-restore-check', Date.now());
   };
+}
+
+// 最新のバックアップを取り込む（上書きではなく合体するので手元の入力が消えない）
+async function pullLatestFromDrive() {
+  if (!gdriveTokenClient) {
+    alert('Google APIの初期化中です。少し待ってから再度お試しください。');
+    return;
+  }
+  if (!gdriveAccessToken) {        // スマホで開いた直後はトークンが無いのでここで取得
+    gdrivePendingAction = 'pullLatest';
+    gdriveTokenClient.requestAccessToken();
+    return;
+  }
+  try {
+    const remote = await fetchLatestBackup();
+    if (!remote) { alert('Googleドライブにバックアップが見つかりません'); return; }
+    const r = mergeRemoteIntoLocal(remote);
+    lsSet('nae-last-sync', Date.now());
+    lsSet('nae-last-sync-check', Date.now());
+    renderCalendar();
+    renderOrderList();
+    alert(r.added ? ('✅ 最新データを取り込みました\n他の端末の ' + r.added + '件を追加しました。')
+                  : '✅ 取り込み完了（すでに最新の内容でした）');
+  } catch(e) {
+    if (e.message === 'AUTH') {
+      gdriveAccessToken = null;
+      gdrivePendingAction = 'pullLatest';
+      gdriveTokenClient.requestAccessToken();
+      return;
+    }
+    alert('取り込みに失敗しました: ' + e.message);
+  }
 }
 
 // ── 終了ボタン：バックアップしてアプリを閉じる ──────────

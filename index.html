@@ -1241,11 +1241,9 @@ function initApp() {
     renderCalendar();
     showScreen('screen-calendar');
 
-    // 起動時：最後に同期してから10分以上あいていれば取得バナーを出す
-    // （スマホはアプリを開くたびに新しいセッションになるので、ここで必ず気付けるようにする）
-    if (Date.now() - lsGet('nae-last-sync', 0) > 10 * 60 * 1000) {
-      showGdriveRestoreBanner();
-    }
+    // 起動時：最後に同期してから10分以上あいていれば、自動でドライブの最新を取り込む
+    // （スマホはアプリを開くたびに新しいセッションになるので、ここを自動化しないと取り残される）
+    setTimeout(autoSyncOnStart, 300);
     // ⑵ 保存されずに終わった入力があれば復元を促す
     setTimeout(offerOrderDraft, 400);
     // 播種忘れアラーム：起動時に予定超過があれば必ず知らせる
@@ -1382,6 +1380,28 @@ const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 let gdriveTokenClient = null;
 let gdriveAccessToken = null;
 let gdrivePendingAction = null; // 'backup' | 'restore'
+
+// ── アクセストークンの引き継ぎ ──────────────────────
+// スマホはアプリを開くたびに新しいセッションになり、毎回Googleの画面操作が必要だった。
+// トークン（有効1時間）を端末に残しておき、生きているうちは画面操作なしで同期する。
+// 権限は drive.file（このアプリが作ったファイルのみ）なので影響範囲は限定的。
+const GD_TOKEN_KEY = 'nae-gd-token';
+function saveGdToken(resp) {
+  gdriveAccessToken = resp.access_token;
+  const sec = Number(resp.expires_in || 3600);
+  // 期限ぎりぎりでの失敗を避けて2分前に切れる扱いにする
+  try { lsSet(GD_TOKEN_KEY, { t: resp.access_token, exp: Date.now() + Math.max(60, sec - 120) * 1000 }); } catch(e) {}
+}
+function restoreGdToken() {
+  if (gdriveAccessToken) return true;
+  const v = lsGet(GD_TOKEN_KEY, null);
+  if (v && v.t && v.exp > Date.now()) { gdriveAccessToken = v.t; return true; }
+  return false;
+}
+function clearGdToken() {
+  gdriveAccessToken = null;
+  try { localStorage.removeItem(GD_TOKEN_KEY); } catch(e) {}
+}
 
 // ── 端末をまたいだデータ合体（マージ）────────────────
 // 削除記録：合体時に「消したはずのデータ」が復活しないようにする
@@ -1587,10 +1607,18 @@ function initGdrive() {
       prompt: '',
       callback: (resp) => {
         if (resp.error) {
+          // 自動同期の裏側で失敗した時は警告を出さず、取得バナーに戻すだけにする
+          if (gdrivePendingAction === 'pullLatestSilent') {
+            gdrivePendingAction = null;
+            hideSyncChip();
+            showGdriveRestoreBanner();
+            return;
+          }
           alert('認証エラー: ' + resp.error);
           return;
         }
-        gdriveAccessToken = resp.access_token;
+        saveGdToken(resp);
+        if (gdrivePendingAction === 'pullLatestSilent') { pullLatestFromDrive({ silent: true }); return; }
         if (gdrivePendingAction === 'backup') doGdriveBackup();
         else if (gdrivePendingAction === 'restore') doGdriveRestore();
         else if (gdrivePendingAction === 'exitBackup') doExitBackup();
@@ -1615,7 +1643,7 @@ document.getElementById('btn-gdrive-backup').onclick = () => {
     return;
   }
   gdrivePendingAction = 'backup';
-  if (gdriveAccessToken) doGdriveBackup();
+  if (restoreGdToken()) doGdriveBackup();
   else gdriveTokenClient.requestAccessToken();
 };
 
@@ -1626,7 +1654,7 @@ document.getElementById('btn-gdrive-tidy').onclick = () => {
   }
   if (!confirm('Googleドライブのバックアップを整理します。\n\n・「' + GDRIVE_FOLDER_NAME + '」フォルダにまとめます\n・直近' + GDRIVE_KEEP_DAYS + '件を残し、古い分はゴミ箱へ移します\n\n※完全削除ではないので30日間は元に戻せます。')) return;
   gdrivePendingAction = 'tidy';
-  if (gdriveAccessToken) doGdriveTidy();
+  if (restoreGdToken()) doGdriveTidy();
   else gdriveTokenClient.requestAccessToken();
 };
 
@@ -1643,7 +1671,7 @@ async function doGdriveTidy() {
           '✔ 残した件数：' + r.kept + '件');
   } catch(e) {
     if (e.message === 'AUTH') {
-      gdriveAccessToken = null;
+      clearGdToken();
       gdrivePendingAction = 'tidy';
       gdriveTokenClient.requestAccessToken();
       return;
@@ -1661,7 +1689,7 @@ document.getElementById('btn-gdrive-restore').onclick = () => {
     return;
   }
   gdrivePendingAction = 'restore';
-  if (gdriveAccessToken) doGdriveRestore();
+  if (restoreGdToken()) doGdriveRestore();
   else gdriveTokenClient.requestAccessToken();
 };
 
@@ -1682,7 +1710,7 @@ async function doGdriveBackup() {
     alert(msg);
   } catch(e) {
     if (e.message === 'AUTH') {
-      gdriveAccessToken = null;
+      clearGdToken();
       if (labelEl) labelEl.textContent = 'Googleドライブにバックアップ';
       btn.disabled = false;
       gdrivePendingAction = 'backup';
@@ -1704,7 +1732,7 @@ async function doGdriveRestore() {
       '&orderBy=createdTime desc&fields=files(id,name,createdTime)&pageSize=30',
       { headers: { 'Authorization': 'Bearer ' + gdriveAccessToken } });
     if (listRes.status === 401 || listRes.status === 403) {
-      gdriveAccessToken = null;
+      clearGdToken();
       gdrivePendingAction = 'restore';
       gdriveTokenClient.requestAccessToken();
       return;
@@ -1773,7 +1801,8 @@ const SYNC_CHECK_INTERVAL = 60 * 60 * 1000;   // 1時間
 let syncChecking = false;
 
 async function checkRemoteUpdate(force) {
-  if (syncChecking || !gdriveAccessToken) return;
+  // 端末に残したトークンが生きていれば、画面操作なしでも問い合わせできる
+  if (syncChecking || !restoreGdToken()) return;
   const last = lsGet('nae-last-sync-check', 0);
   if (!force && Date.now() - last < SYNC_CHECK_INTERVAL) return;   // 通常は1時間あけて問い合わせる
   syncChecking = true;
@@ -1850,36 +1879,113 @@ function showGdriveRestoreBanner() {
   };
 }
 
+// ── 同期中の小さな表示（起動時はアラートを出さず、ここで知らせる）────
+let syncChipTimer = null;
+function showSyncChip(msg, ms) {
+  let el = document.getElementById('sync-chip');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sync-chip';
+    el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:8px;z-index:9998;' +
+      'background:rgba(21,101,192,0.95);color:#fff;font-size:12.5px;font-weight:600;' +
+      'padding:8px 14px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,0.3);max-width:92vw;text-align:center';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(syncChipTimer);
+  if (ms) syncChipTimer = setTimeout(hideSyncChip, ms);
+}
+function hideSyncChip() {
+  clearTimeout(syncChipTimer);
+  const el = document.getElementById('sync-chip');
+  if (el) el.style.display = 'none';
+}
+
 // 最新のバックアップを取り込む（上書きではなく合体するので手元の入力が消えない）
-async function pullLatestFromDrive() {
+// opts.silent … 起動時の自動同期。アラートを出さず小さな表示で済ませる
+async function pullLatestFromDrive(opts) {
+  const silent = !!(opts && opts.silent);
+  const say = (m) => silent ? showSyncChip(m, 3500) : alert(m);
   if (!gdriveTokenClient) {
+    if (silent) { hideSyncChip(); showGdriveRestoreBanner(); return; }
     alert('Google APIの初期化中です。少し待ってから再度お試しください。');
     return;
   }
-  if (!gdriveAccessToken) {        // スマホで開いた直後はトークンが無いのでここで取得
-    gdrivePendingAction = 'pullLatest';
+  if (!restoreGdToken()) {         // スマホで開いた直後はトークンが無いのでここで取得
+    gdrivePendingAction = silent ? 'pullLatestSilent' : 'pullLatest';
     gdriveTokenClient.requestAccessToken();
     return;
   }
+  if (silent) showSyncChip('☁️ 最新データを確認中…');
   try {
     const remote = await fetchLatestBackup();
-    if (!remote) { alert('Googleドライブにバックアップが見つかりません'); return; }
+    if (!remote) {
+      if (silent) hideSyncChip();
+      else alert('Googleドライブにバックアップが見つかりません');
+      return;
+    }
     const r = mergeRemoteIntoLocal(remote);
     lsSet('nae-last-sync', Date.now());
     lsSet('nae-last-sync-check', Date.now());
     renderCalendar();
     renderOrderList();
-    alert(r.added ? ('✅ 最新データを取り込みました\n他の端末の ' + r.added + '件を追加しました。')
-                  : '✅ 取り込み完了（すでに最新の内容でした）');
+    const b = document.getElementById('gdrive-restore-banner');
+    if (b) b.style.display = 'none';
+    say(r.added ? ('✅ 最新データを取り込みました' + (silent ? '（' + r.added + '件追加）' : '\n他の端末の ' + r.added + '件を追加しました。'))
+                : (silent ? '✅ 最新の状態です' : '✅ 取り込み完了（すでに最新の内容でした）'));
   } catch(e) {
     if (e.message === 'AUTH') {
-      gdriveAccessToken = null;
-      gdrivePendingAction = 'pullLatest';
+      clearGdToken();
+      gdrivePendingAction = silent ? 'pullLatestSilent' : 'pullLatest';
       gdriveTokenClient.requestAccessToken();
       return;
     }
+    if (silent) { hideSyncChip(); showGdriveRestoreBanner(); return; }
     alert('取り込みに失敗しました: ' + e.message);
   }
+}
+
+// ── 起動時の自動同期 ────────────────────────────────
+// ① 端末に残っているトークンが生きていれば、何も操作せずそのまま取り込む
+// ② 切れている時は画面操作が必須（Googleのポップアップがブロックされるため）なので、
+//    最初に画面をどこか触った瞬間に便乗して取得し、続けて自動で取り込む
+function autoSyncOnStart() {
+  if (Date.now() - lsGet('nae-last-sync', 0) <= 10 * 60 * 1000) return;  // 直前に同期済み
+  if (restoreGdToken()) {
+    waitTokenClient(() => pullLatestFromDrive({ silent: true }));
+    return;
+  }
+  armFirstTouchSync();
+}
+
+// google.accounts の読み込みを少し待つ（最大10秒）
+function waitTokenClient(fn, tries) {
+  const n = tries || 0;
+  if (gdriveTokenClient) { fn(); return; }
+  if (n > 40) { showGdriveRestoreBanner(); return; }
+  setTimeout(() => waitTokenClient(fn, n + 1), 250);
+}
+
+function armFirstTouchSync() {
+  showSyncChip('☁️ 画面に触れると最新データを取り込みます');
+  let done = false;
+  const go = () => {
+    if (done) return;
+    done = true;
+    document.removeEventListener('pointerdown', go, true);
+    document.removeEventListener('keydown', go, true);
+    waitTokenClient(() => {
+      showSyncChip('☁️ 最新データを確認中…');
+      gdrivePendingAction = 'pullLatestSilent';
+      try { gdriveTokenClient.requestAccessToken(); }
+      catch(e) { hideSyncChip(); showGdriveRestoreBanner(); }
+    });
+  };
+  document.addEventListener('pointerdown', go, true);
+  document.addEventListener('keydown', go, true);
+  // 20秒触られなければ、見落とし防止に従来のバナーも出す
+  setTimeout(() => { if (!done) { hideSyncChip(); showGdriveRestoreBanner(); } }, 20000);
 }
 
 // ── 終了ボタン：バックアップしてアプリを閉じる ──────────
@@ -1904,7 +2010,7 @@ async function doExitBackup() {
   } catch(e) {
     document.body.removeChild(overlay);
     if (e.message === 'AUTH') {
-      gdriveAccessToken = null;
+      clearGdToken();
       gdrivePendingAction = 'exitBackup';
       gdriveTokenClient.requestAccessToken();
       return;
@@ -1927,7 +2033,7 @@ document.getElementById('btn-exit-app').onclick = () => {
     if (!confirm('保存せずに終了します。\n入力内容はバックアップされません。\n\n本当に終了しますか？\n（下書きは残るので次回復元できます）')) return;
   }
   if (!confirm('Googleドライブにバックアップしてアプリを終了しますか？')) return;
-  if (!gdriveAccessToken) {
+  if (!restoreGdToken()) {
     if (!gdriveTokenClient) { alert('Google APIの初期化中です。少し待ってから再度お試しください。'); return; }
     gdrivePendingAction = 'exitBackup';
     gdriveTokenClient.requestAccessToken();
@@ -1940,7 +2046,7 @@ document.getElementById('btn-exit-app').onclick = () => {
 let autoBackupDone = false;
 async function autoBackupSilent() {
   if (autoBackupDone) return;
-  if (!gdriveAccessToken) return;
+  if (!restoreGdToken()) return;
   if (orders.length === 0 && pestLogs.length === 0) return;
   autoBackupDone = true;
   try {
@@ -5069,7 +5175,7 @@ function takePhotoAndReport(stage) {
   input.onchange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!gdriveAccessToken) {
+    if (!restoreGdToken()) {
       pendingPhotoCtx = { file, stage, order: o, actualDate };
       gdrivePendingAction = 'photo';
       if (gdriveTokenClient) gdriveTokenClient.requestAccessToken();

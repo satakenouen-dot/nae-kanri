@@ -4814,13 +4814,13 @@ function printOrderAcceptance() {
   const yen = v => (v === '' || v == null) ? '' : Number(v).toLocaleString('ja-JP') + '円';
 
   const bodyRows = list.map(x => `<tr>
-      <td class="c">${fmtJPFull(x.orderDate)}</td>
+      <td class="c d">${fmtJPFull(x.orderDate)}</td>
       <td>${esc(x.crop)}</td>
       <td>${esc(x.variety)}</td>
       <td class="r">${esc(x.qty)}</td>
       <td class="r">${yen(x.price)}</td>
-      <td class="c">${fmtJPFull(x.sowDate)}</td>
-      <td class="c">${fmtJPFull(x.delivery)}</td>
+      <td class="c d">${fmtJPFull(x.sowDate)}</td>
+      <td class="c d">${fmtJPFull(x.delivery)}</td>
     </tr>`).join('');
   // 記入欄として最低5行を確保
   const blanks = Array.from({ length: Math.max(0, 5 - list.length) },
@@ -4847,6 +4847,8 @@ function printOrderAcceptance() {
   thead { display: table-header-group; }
   td.c { text-align: center; white-space: nowrap; }
   td.r { text-align: right; white-space: nowrap; }
+  /* 日付は「2026年10月30日」で最長。枠内に収まるよう少し小さめ＋余白を詰める */
+  th.d, td.d { font-size: 8pt; padding-left: 1px; padding-right: 1px; }
   .terms-title { font-weight: 700; margin: 6px 0 3px; }
   ol.terms { margin: 0 0 10px; padding-left: 1.6em; }
   ol.terms li { font-size: 9.5pt; line-height: 1.65; margin-bottom: 1px; }
@@ -4874,10 +4876,10 @@ function printOrderAcceptance() {
 
 <table>
   <colgroup>
-    <col style="width:13%"><col style="width:12%"><col style="width:27%"><col style="width:9%"><col style="width:13%"><col style="width:13%"><col style="width:13%">
+    <col style="width:15%"><col style="width:10%"><col style="width:24%"><col style="width:10%"><col style="width:11%"><col style="width:15%"><col style="width:15%">
   </colgroup>
   <thead>
-    <tr><th>受注日</th><th>品目</th><th>品種</th><th>本数</th><th>単価(税別)</th><th>播種日</th><th>納品予定日</th></tr>
+    <tr><th class="d">受注日</th><th>品目</th><th>品種</th><th>本数</th><th>単価(税別)</th><th class="d">播種日</th><th class="d">納品予定日</th></tr>
   </thead>
   <tbody>${bodyRows}${blanks}</tbody>
 </table>

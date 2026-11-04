@@ -77,6 +77,7 @@ body{
 .ev-tag.出荷{background:var(--red-l);color:var(--red);border-color:var(--red)}
 .ev-tag.農薬{background:var(--purple-l);color:var(--purple);border-color:var(--purple)}
 .ev-tag.ベスト{background:#FFF8E1;color:#F57F17;border-color:#F9A825}
+.ev-tag.Gカレ{background:#ECEFF1;color:#37474F;border-color:#78909C}
 .more-badge{font-size:10px;font-weight:700;color:#fff;background:var(--green);border-radius:3px;text-align:center;padding:1px 2px;line-height:1.5;letter-spacing:-.3px}
 .legend{background:#fff;border-top:1px solid var(--border);padding:6px 12px;display:flex;gap:10px;flex-wrap:wrap}
 .leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)}
@@ -179,6 +180,8 @@ input[type=number]{-moz-appearance:textfield}
 .ev-card.出荷{background:var(--red-l);border-color:var(--red)}
 .ev-card.農薬{background:var(--purple-l);border-color:var(--purple)}
 .ev-card.ベスト{background:#FFF8E1;border-color:#F9A825}
+.ev-card.Gカレ{background:#ECEFF1;border-color:#78909C}
+.ev-card.Gカレ .ev-card-type{color:#455A64}
 .ev-card-type{font-size:11px;font-weight:600;margin-bottom:4px}
 .ev-card.播種 .ev-card-type{color:var(--blue)}
 .ev-card.接ぎ木 .ev-card-type{color:var(--orange)}
@@ -297,6 +300,7 @@ input[type=number]{-moz-appearance:textfield}
       <div class="leg-item"><div class="leg-dot" style="background:var(--red-l);border-color:var(--red)"></div>出荷</div>
       <div class="leg-item"><div class="leg-dot" style="background:var(--purple-l);border-color:var(--purple)"></div>農薬</div>
       <div class="leg-item"><div class="leg-dot" style="background:#fff;border:1.5px solid var(--purple);border-left-width:3px"></div>外注入荷</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#ECEFF1;border-color:#78909C"></div>Googleカレンダー</div>
     </div>
   </div>
   <button class="fab" id="btn-cal-add">＋</button>
@@ -764,6 +768,22 @@ input[type=number]{-moz-appearance:textfield}
     <button class="settings-item" id="btn-gcal-clear">
       <span class="settings-icon">🗑</span>
       <span>同期情報をクリア（やり直し）</span>
+      <span style="margin-left:auto;color:var(--text2)">›</span>
+    </button>
+    <div class="settings-section-title">Googleカレンダーの予定を表示</div>
+    <div style="padding:8px 16px;background:var(--green-l);font-size:11px;color:var(--text2);line-height:1.6">
+      Googleカレンダー（メインのカレンダー）に入っている予定を、アプリのカレンダーにも灰色で表示します。読み取るだけなのでGoogleカレンダー側は変わりません。
+    </div>
+    <div style="padding:10px 16px;background:#fff;border-bottom:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" id="gcal-show-enable" style="width:18px;height:18px">
+        <span>アプリのカレンダーに表示する</span>
+      </label>
+      <div id="gcal-show-status" style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6"></div>
+    </div>
+    <button class="settings-item" id="btn-gcal-fetch">
+      <span class="settings-icon">🔄</span>
+      <span>Googleカレンダーの予定を取り込む</span>
       <span style="margin-left:auto;color:var(--text2)">›</span>
     </button>
     <button class="settings-item" id="btn-import-backup">
@@ -1244,6 +1264,8 @@ function initApp() {
     // 起動時：最後に同期してから10分以上あいていれば、自動でドライブの最新を取り込む
     // （スマホはアプリを開くたびに新しいセッションになるので、ここを自動化しないと取り残される）
     setTimeout(autoSyncOnStart, 300);
+    // Googleカレンダーの予定表示がONなら、最新の予定を取りに行く
+    setTimeout(() => { if (gcalShowCfg.enabled) loadGcalForView({ silent: true }); }, 700);
     // ⑵ 保存されずに終わった入力があれば復元を促す
     setTimeout(offerOrderDraft, 400);
     // 播種忘れアラーム：起動時に予定超過があれば必ず知らせる
@@ -1595,6 +1617,7 @@ async function tidyBackups(keep) {
 }
 
 function initGdrive() {
+  if (gdriveTokenClient) return;          // 二重初期化を防ぐ
   if (!window.google?.accounts?.oauth2) {
     setTimeout(initGdrive, 500);
     return;
@@ -1618,7 +1641,11 @@ function initGdrive() {
           return;
         }
         saveGdToken(resp);
-        if (gdrivePendingAction === 'pullLatestSilent') { pullLatestFromDrive({ silent: true }); return; }
+        if (gdrivePendingAction === 'pullLatestSilent') {
+          gdrivePendingAction = null;
+          pullLatestFromDrive({ silent: true });
+          return;
+        }
         if (gdrivePendingAction === 'backup') doGdriveBackup();
         else if (gdrivePendingAction === 'restore') doGdriveRestore();
         else if (gdrivePendingAction === 'exitBackup') doExitBackup();
@@ -1635,6 +1662,9 @@ function initGdrive() {
     console.error('GDrive init:', e);
   }
 }
+// loadを待たずに開始する（google読み込み前でも自分で待ち直すので安全）。
+// loadが既に済んでいる復帰時に初期化されず認証できなくなるのを防ぐ。
+initGdrive();
 window.addEventListener('load', initGdrive);
 
 document.getElementById('btn-gdrive-backup').onclick = () => {
@@ -1967,12 +1997,15 @@ function waitTokenClient(fn, tries) {
   setTimeout(() => waitTokenClient(fn, n + 1), 250);
 }
 
+let driveTouchArmed = false;
 function armFirstTouchSync() {
   showSyncChip('☁️ 画面に触れると最新データを取り込みます');
   let done = false;
+  driveTouchArmed = true;
   const go = () => {
     if (done) return;
     done = true;
+    driveTouchArmed = false;
     document.removeEventListener('pointerdown', go, true);
     document.removeEventListener('keydown', go, true);
     waitTokenClient(() => {
@@ -1985,7 +2018,7 @@ function armFirstTouchSync() {
   document.addEventListener('pointerdown', go, true);
   document.addEventListener('keydown', go, true);
   // 20秒触られなければ、見落とし防止に従来のバナーも出す
-  setTimeout(() => { if (!done) { hideSyncChip(); showGdriveRestoreBanner(); } }, 20000);
+  setTimeout(() => { if (!done) { driveTouchArmed = false; hideSyncChip(); showGdriveRestoreBanner(); } }, 20000);
 }
 
 // ── 終了ボタン：バックアップしてアプリを閉じる ──────────
@@ -2075,6 +2108,197 @@ let gcalTokenClient = null;
 let gcalAccessToken = null;
 let gcalSyncMap = lsGet('nae-gcal-sync', {});
 let gcalReminderCfg = lsGet('nae-gcal-cfg', { enabled: true, hour: 8, daysBefore: [1] });
+let gcalPendingAction = null;   // 'sync' | 'fetch'
+
+// ── カレンダー用トークンの引き継ぎ（ドライブと同じ仕組み）────
+// スマホは開くたびに新セッションになるので、1時間有効なトークンを端末に残す
+const GC_TOKEN_KEY = 'nae-gc-token';
+function saveGcToken(resp) {
+  gcalAccessToken = resp.access_token;
+  const sec = Number(resp.expires_in || 3600);
+  try { lsSet(GC_TOKEN_KEY, { t: resp.access_token, exp: Date.now() + Math.max(60, sec - 120) * 1000 }); } catch(e) {}
+}
+function restoreGcToken() {
+  if (gcalAccessToken) return true;
+  const v = lsGet(GC_TOKEN_KEY, null);
+  if (v && v.t && v.exp > Date.now()) { gcalAccessToken = v.t; return true; }
+  return false;
+}
+function clearGcToken() {
+  gcalAccessToken = null;
+  try { localStorage.removeItem(GC_TOKEN_KEY); } catch(e) {}
+}
+
+// ── Googleカレンダーの予定をアプリのカレンダーに表示 ────────
+let gcalShowCfg = lsGet('nae-gcal-show', { enabled: false });
+let gcalViewEvents = lsGet('nae-gcal-view', {});   // { 'YYYY-MM': [{date,time,summary,id}] }
+let gcalFetching = {};                             // 取得中の月（二重取得を防ぐ）
+
+function gcalMonthKey(y, m) { return y + '-' + pad2(m); }
+// 基準日から n か月ずらした 'YYYY-MM'
+function monthShift(base, n) {
+  const d = new Date(base.getFullYear(), base.getMonth() + n, 1);
+  return gcalMonthKey(d.getFullYear(), d.getMonth() + 1);
+}
+
+// 外部（Googleカレンダー）から来た文字はそのまま埋め込まない
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+// アプリ自身が登録した予定（播種予定など）は二重に出さないよう除く
+function gcalOwnEventIds() {
+  return new Set(Object.values(gcalSyncMap));
+}
+
+// 指定月の予定をGoogleカレンダーから取得してキャッシュ
+async function fetchGcalMonth(y, m) {
+  const key = gcalMonthKey(y, m);
+  if (gcalFetching[key]) return gcalViewEvents[key] || [];
+  gcalFetching[key] = true;
+  try {
+    // 月初〜月末（JSTの0時基準。timeMin/MaxはRFC3339で+09:00を明示する）
+    const timeMin = y + '-' + pad2(m) + '-01T00:00:00+09:00';
+    const lastDay = new Date(y, m, 0).getDate();
+    const timeMax = y + '-' + pad2(m) + '-' + pad2(lastDay) + 'T23:59:59+09:00';
+    const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events' +
+      '?singleEvents=true&orderBy=startTime&maxResults=250' +
+      '&timeMin=' + encodeURIComponent(timeMin) +
+      '&timeMax=' + encodeURIComponent(timeMax);
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + gcalAccessToken } });
+    if (res.status === 401 || res.status === 403) throw new Error('AUTH');
+    if (!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    const own = gcalOwnEventIds();
+    const list = [];
+    for (const ev of (data.items || [])) {
+      if (ev.status === 'cancelled') continue;
+      if (own.has(ev.id)) continue;                 // アプリが作った予定は除外
+      const st = ev.start || {};
+      let date, time = '';
+      if (st.date) {                                // 終日予定
+        date = st.date;
+      } else if (st.dateTime) {
+        const d = new Date(st.dateTime);            // JSTの日付・時刻に直す
+        const j = new Date(d.getTime() + 9 * 3600000);
+        date = j.getUTCFullYear() + '-' + pad2(j.getUTCMonth() + 1) + '-' + pad2(j.getUTCDate());
+        time = pad2(j.getUTCHours()) + ':' + pad2(j.getUTCMinutes());
+      } else continue;
+      list.push({ date, time, summary: ev.summary || '(タイトルなし)', id: ev.id,
+                  location: ev.location || '' });
+    }
+    gcalViewEvents[key] = list;
+    gcalViewEvents._at = Date.now();
+    // 古い月のキャッシュが溜まり続けないよう、前後6か月だけ残す
+    const now = new Date();
+    const lo = monthShift(now, -6);
+    const hi = monthShift(now, 6);
+    for (const k of Object.keys(gcalViewEvents)) {
+      if (k === '_at') continue;
+      if (k < lo || k > hi) delete gcalViewEvents[k];
+    }
+    lsSet('nae-gcal-view', gcalViewEvents);
+    return list;
+  } finally {
+    delete gcalFetching[key];
+  }
+}
+
+// 表示中の月（と前後1か月）を取り込んでカレンダーを描き直す
+async function loadGcalForView(opts) {
+  const silent = !!(opts && opts.silent);
+  if (!gcalShowCfg.enabled) return;
+  if (!restoreGcToken()) {
+    if (!gcalTokenClient) return;
+    gcalPendingAction = 'fetch';
+    if (silent) { armGcalFirstTouch(); return; }   // ポップアップは画面操作が必要
+    gcalTokenClient.requestAccessToken();
+    return;
+  }
+  const months = [[viewYear, viewMonth]];
+  let pm = viewMonth - 1, py = viewYear; if (pm < 1) { pm = 12; py--; }
+  let nm = viewMonth + 1, ny = viewYear; if (nm > 12) { nm = 1; ny++; }
+  months.push([py, pm], [ny, nm]);
+  try {
+    for (const [y, m] of months) await fetchGcalMonth(y, m);
+    renderCalendar();
+    if (!silent) showSyncChip('✅ Googleカレンダーの予定を取り込みました', 3000);
+  } catch(e) {
+    if (e.message === 'AUTH') {
+      clearGcToken();
+      gcalPendingAction = 'fetch';
+      if (silent) armGcalFirstTouch();
+      else if (gcalTokenClient) gcalTokenClient.requestAccessToken();
+      return;
+    }
+    if (!silent) alert('Googleカレンダーの取り込みに失敗しました: ' + e.message);
+  }
+}
+
+// トークン切れ時：最初に画面を触った瞬間に便乗して取得する
+let gcalTouchArmed = false;
+function armGcalFirstTouch() {
+  if (gcalTouchArmed) return;
+  gcalTouchArmed = true;
+  const go = () => {
+    // ドライブの同期認証が先。重なると画面が2つ出てしまうので次のタップに回す
+    if (driveTouchArmed || gdrivePendingAction) return;
+    document.removeEventListener('pointerdown', go, true);
+    document.removeEventListener('keydown', go, true);
+    gcalTouchArmed = false;
+    if (!gcalTokenClient) return;
+    gcalPendingAction = 'fetch';
+    try { gcalTokenClient.requestAccessToken(); } catch(e) {}
+  };
+  document.addEventListener('pointerdown', go, true);
+  document.addEventListener('keydown', go, true);
+}
+
+// アプリに戻ってきた時、30分以上たっていれば予定を取り直す（Google側の変更を反映）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!gcalShowCfg.enabled) return;
+  if (Date.now() - (gcalViewEvents._at || 0) < 30 * 60 * 1000) return;
+  if (!restoreGcToken()) return;          // 認証が必要な時は無理に出さない
+  loadGcalForView({ silent: true });
+});
+
+// 設定UI
+(function initGcalShowUi(){
+  const el = document.getElementById('gcal-show-enable');
+  if (!el) return;
+  const status = document.getElementById('gcal-show-status');
+  const paint = () => {
+    if (!status) return;
+    const at = gcalViewEvents._at;
+    const n = Object.keys(gcalViewEvents).filter(k => k !== '_at')
+      .reduce((s, k) => s + (gcalViewEvents[k] || []).length, 0);
+    status.textContent = gcalShowCfg.enabled
+      ? (at ? '取込済み：' + n + '件（' + fmtJST(new Date(at).toISOString()) + '）'
+            : 'まだ取り込んでいません。下の「取り込む」を押してください。')
+      : '';
+  };
+  el.checked = !!gcalShowCfg.enabled;
+  paint();
+  el.onchange = () => {
+    gcalShowCfg = { enabled: el.checked };
+    lsSet('nae-gcal-show', gcalShowCfg);
+    if (el.checked) loadGcalForView();
+    else renderCalendar();
+    paint();
+  };
+  const btn = document.getElementById('btn-gcal-fetch');
+  if (btn) btn.onclick = async () => {
+    if (!gcalShowCfg.enabled) {
+      gcalShowCfg = { enabled: true };
+      lsSet('nae-gcal-show', gcalShowCfg);
+      el.checked = true;
+    }
+    await loadGcalForView();
+    paint();
+  };
+  window.paintGcalShowStatus = paint;
+})();
 
 // 設定UIの初期値復元 & 変更時の保存
 (function initReminderUi(){
@@ -2099,6 +2323,7 @@ let gcalReminderCfg = lsGet('nae-gcal-cfg', { enabled: true, hour: 8, daysBefore
 })();
 
 function initGcal() {
+  if (gcalTokenClient) return;            // 二重初期化を防ぐ
   if (!window.google?.accounts?.oauth2) {
     setTimeout(initGcal, 500);
     return;
@@ -2110,13 +2335,22 @@ function initGcal() {
       login_hint: GOAUTH_LOGIN_HINT,
       prompt: '',
       callback: (resp) => {
-        if (resp.error) { alert('カレンダー認証エラー: ' + resp.error); return; }
-        gcalAccessToken = resp.access_token;
+        if (resp.error) {
+          // 表示用の取り込みは裏側の処理なので黙って諦める
+          if (gcalPendingAction === 'fetch') { gcalPendingAction = null; return; }
+          alert('カレンダー認証エラー: ' + resp.error);
+          return;
+        }
+        saveGcToken(resp);
+        const act = gcalPendingAction;
+        gcalPendingAction = null;
+        if (act === 'fetch') { loadGcalForView({ silent: true }); return; }
         doGcalSync();
       }
     });
   } catch(e) { console.error('GCal init:', e); }
 }
+initGcal();
 window.addEventListener('load', initGcal);
 
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -2170,7 +2404,8 @@ async function gcalUpsertEvent(syncKey, event) {
 
 document.getElementById('btn-gcal-sync').onclick = () => {
   if (!gcalTokenClient) { alert('Google APIの初期化中です。少し待ってから再度お試しください。'); return; }
-  if (gcalAccessToken) doGcalSync();
+  gcalPendingAction = 'sync';
+  if (restoreGcToken()) { gcalPendingAction = null; doGcalSync(); }
   else gcalTokenClient.requestAccessToken();
 };
 
@@ -2218,7 +2453,7 @@ async function doGcalSync() {
           await gcalUpsertEvent(syncKey, event);
         } catch(e) {
           if (e.message === 'AUTH') {
-            gcalAccessToken = null;
+            clearGcToken();
             gcalTokenClient.requestAccessToken();
             return;
           }
@@ -2250,7 +2485,7 @@ async function doGcalSync() {
         await gcalUpsertEvent(syncKey, event);
       } catch(e) {
         if (e.message === 'AUTH') {
-          gcalAccessToken = null;
+          clearGcToken();
           gcalTokenClient.requestAccessToken();
           return;
         }
@@ -2278,7 +2513,7 @@ async function doGcalSync() {
 
 // 注文保存時：認証済みならGoogleカレンダーへ静かに同期（播種日などをスマホ通知）
 async function autoSyncOrderToGcal(o) {
-  if (!gcalReminderCfg.enabled || !gcalAccessToken || !o) return;
+  if (!gcalReminderCfg.enabled || !restoreGcToken() || !o) return;
   const fields = [
     { key: 'sow',   label: '播種',   date: o.sowDate,   icon: '🌱' },
     { key: 'graft', label: isGraft(o.type) ? '接ぎ木' : '定植', date: o.graftDate, icon: isGraft(o.type) ? '🪡' : '🌿' },
@@ -2300,7 +2535,7 @@ async function autoSyncOrderToGcal(o) {
     try {
       await gcalUpsertEvent(syncKey, buildTimedEvent(f.date, summary, description));
     } catch(e) {
-      if (e.message === 'AUTH') { gcalAccessToken = null; return; }
+      if (e.message === 'AUTH') { clearGcToken(); return; }
       console.error('auto gcal sync:', syncKey, e);
     }
   }
@@ -2709,17 +2944,26 @@ function calcSuggest(crop, type, delivery) {
 }
 
 // ── カレンダー ────────────────────────────────────────
+// 月を動かしたら、その月のGoogleカレンダーの予定がまだ無ければ取りに行く
+function ensureGcalForView() {
+  if (!gcalShowCfg.enabled) return;
+  if (gcalViewEvents[gcalMonthKey(viewYear, viewMonth)]) return;   // キャッシュ済み
+  loadGcalForView({ silent: true });
+}
 document.getElementById('btn-prev').onclick = () => {
   if (--viewMonth < 1) { viewMonth = 12; viewYear--; }
   renderCalendar();
+  ensureGcalForView();
 };
 document.getElementById('btn-next').onclick = () => {
   if (++viewMonth > 12) { viewMonth = 1; viewYear++; }
   renderCalendar();
+  ensureGcalForView();
 };
 document.getElementById('btn-today').onclick = () => {
   const n = new Date(); viewYear = n.getFullYear(); viewMonth = n.getMonth() + 1;
   renderCalendar();
+  ensureGcalForView();
 };
 
 function renderCalendar() {
@@ -2867,6 +3111,13 @@ function renderCalendar() {
   for (const p of pestLogs) {
     addEv(p.date, { type: '農薬', label: p.pestName || '農薬', log: p });
   }
+  // Googleカレンダーの予定（読み取り専用。アプリの予定より後ろに並べる）
+  if (gcalShowCfg.enabled) {
+    for (const g of (gcalViewEvents[gcalMonthKey(viewYear, viewMonth)] || [])) {
+      addEv(g.date, { type: 'Gカレ', typeLabel: 'Googleカレンダー', label: g.summary,
+                      time: g.time, gcal: g });
+    }
+  }
 
   for (let i = 0; i < firstDow; i++) {
     const c = document.createElement('div');
@@ -2892,15 +3143,17 @@ function renderCalendar() {
     const isPlan = e => e.type === '播種予定' || e.type === '入荷予定';
     if (evs.some(isPlan))         cell.classList.add('has-sow');
     if (evs.some(e => e.overdue)) cell.classList.add('sow-overdue');
-    // 予定超過・予定を先頭に並べて見落としを防ぐ
-    const ordered = [...evs].sort((a, b) =>
-      (b.overdue ? 2 : isPlan(b) ? 1 : 0) - (a.overdue ? 2 : isPlan(a) ? 1 : 0));
+    // 予定超過・予定を先頭、Googleカレンダーの予定は最後に並べて見落としを防ぐ
+    const prio = e => e.overdue ? 3 : isPlan(e) ? 2 : e.type === 'Gカレ' ? 0 : 1;
+    const ordered = [...evs].sort((a, b) => prio(b) - prio(a));
     ordered.slice(0, 3).forEach(ev => {
       const tag = document.createElement('div');
       tag.className = `ev-tag ${ev.type}${ev.overdue ? ' overdue' : ''}`;
-      tag.textContent = isPlan(ev)
-        ? `${ev.overdue ? '⚠' : '予'} ${ev.label}`
-        : `${ev.type[0]} ${ev.label}`;
+      tag.textContent = ev.type === 'Gカレ'
+        ? `📅 ${ev.time ? ev.time + ' ' : ''}${ev.label}`
+        : isPlan(ev)
+          ? `${ev.overdue ? '⚠' : '予'} ${ev.label}`
+          : `${ev.type[0]} ${ev.label}`;
       cell.appendChild(tag);
     });
     if (evs.length > 3) {
@@ -2909,7 +3162,7 @@ function renderCalendar() {
       more.textContent = `他${evs.length - 3}件`;
       cell.appendChild(more);
     }
-    cell.onclick = () => openDayModal(d, evs, dateStr);
+    cell.onclick = () => openDayModal(d, ordered, dateStr);
     grid.appendChild(cell);
   }
 }
@@ -2925,10 +3178,12 @@ function openDayModal(d, evs, dateStr) {
     card.className = `ev-card ${ev.type}${ev.overdue ? ' overdue' : ''}`;
     const sub = ev.order
       ? `${ev.order.qty ? ev.order.qty + '　' : ''}${ev.order.customer || ''}`
-      : (ev.log ? (ev.log.pestIngredient || '') : '');
+      : ev.gcal
+        ? escHtml([ev.time ? ev.time + '〜' : '終日', ev.gcal.location].filter(Boolean).join('　'))
+        : (ev.log ? (ev.log.pestIngredient || '') : '');
     card.innerHTML = `
-      <div class="ev-card-type">【${ev.type}】${ev.overdue ? ' ⚠️ 予定日を過ぎています（未播種）' : ''}</div>
-      <div class="ev-card-main">${ev.label}</div>
+      <div class="ev-card-type">【${ev.typeLabel || ev.type}】${ev.overdue ? ' ⚠️ 予定日を過ぎています（未播種）' : ''}</div>
+      <div class="ev-card-main">${ev.gcal ? escHtml(ev.label) : ev.label}</div>
       ${sub ? `<div class="ev-card-sub">${sub}</div>` : ''}`;
     if (ev.order) card.onclick = () => {
       document.getElementById('day-overlay').classList.remove('open');

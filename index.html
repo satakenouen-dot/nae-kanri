@@ -679,6 +679,11 @@ input[type=number]{-moz-appearance:textfield}
     <div></div>
   </div>
   <div class="scroll-body" style="padding:0">
+    <div class="settings-section-title">注文主の並び順（50音）</div>
+    <div style="padding:8px 16px;background:var(--green-l);font-size:11px;color:var(--text2);line-height:1.6">
+      注文一覧の注文主ボタンを50音順に並べます。漢字の読みはよくある姓から推定していますので、違っていればここで直してください（直した読みだけが保存されます）。
+    </div>
+    <div id="yomi-editor" style="background:#fff;border-bottom:1px solid var(--border)"></div>
     <div class="settings-section-title">データ管理</div>
     <button class="settings-item" id="btn-open-master">
       <span class="settings-icon">📦</span>
@@ -1141,6 +1146,7 @@ function showTab(tab) {
   showScreen(map[tab]);
   if (tab === 'orders')   renderOrderList();
   if (tab === 'pesticide') renderPestList();
+  if (tab === 'settings')  renderYomiEditor();
 }
 
 // ── タキイ品種マスター初期データ（2026年5月1日現在 登録中・出願中） ──────────
@@ -1283,7 +1289,7 @@ window.addEventListener('DOMContentLoaded', initApp);
 
 // ── バックアップ エクスポート／インポート ────────────
 document.getElementById('btn-export-data').onclick = () => {
-  const data = { orders, pestLogs, pestMaster, varietyMaster, leadStats, exportedAt: new Date().toISOString() };
+  const data = { orders, pestLogs, pestMaster, varietyMaster, leadStats, customerYomi, exportedAt: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1475,6 +1481,11 @@ function mergeRemoteIntoLocal(remote) {
   if (remote.leadStats && typeof remote.leadStats === 'object') {
     leadStats = Object.assign({}, remote.leadStats, leadStats);
   }
+  // 注文主のよみ（50音順用）も端末間で共有する。手元の入力を優先
+  if (remote.customerYomi && typeof remote.customerYomi === 'object') {
+    customerYomi = Object.assign({}, remote.customerYomi, customerYomi);
+    lsSet('nae-customer-yomi', customerYomi);
+  }
   saveOrders(); savePestLogs(); savePestMaster(); saveVarietyMaster(); saveLeadStats(); saveDeletedIds();
   computeBestStats();
   refreshSeedIngrList();
@@ -1550,7 +1561,7 @@ async function saveBackupToDrive() {
   if (remote) mergeInfo = mergeRemoteIntoLocal(remote);
 
   const json = JSON.stringify({
-    orders, pestLogs, pestMaster, varietyMaster, leadStats, deletedIds,
+    orders, pestLogs, pestMaster, varietyMaster, leadStats, customerYomi, deletedIds,
     exportedAt: new Date().toISOString(), version: 2
   }, null, 2);
   const fileName = 'nae-backup_' + jstStamp(false).split('_')[0] + '.json';  // 1日1ファイル
@@ -2557,6 +2568,9 @@ document.getElementById('backup-file').addEventListener('change', e => {
       if (Array.isArray(data.pestMaster)){ pestMaster = data.pestMaster; savePestMaster(); }
       if (Array.isArray(data.varietyMaster)){ varietyMaster = data.varietyMaster; saveVarietyMaster(); }
       if (data.leadStats && typeof data.leadStats === 'object') { leadStats = data.leadStats; saveLeadStats(); }
+      if (data.customerYomi && typeof data.customerYomi === 'object') {
+        customerYomi = data.customerYomi; lsSet('nae-customer-yomi', customerYomi);
+      }
       computeBestStats();
       refreshSeedIngrList();
       renderImportCurrentStats();
@@ -3889,11 +3903,134 @@ document.getElementById('btn-order-submit').onclick = async () => {
 let customerFilter = null;        // 注文主ピックアップの選択状態
 let statusFilter   = 'pending';   // 状態タブ（pending / growing / shipped）
 
+// ── 注文主を50音順に並べる ─────────────────────────────
+// 漢字の読みはデータから分からない（localeCompareは漢字を文字コード順に並べてしまう）。
+// よくある姓の読み表から推定し、違っていれば設定画面で直せるようにする。
+const SURNAME_YOMI = {
+  佐藤:'さとう', 鈴木:'すずき', 高橋:'たかはし', 髙橋:'たかはし', 田中:'たなか',
+  伊藤:'いとう', 渡辺:'わたなべ', 渡邊:'わたなべ', 渡邉:'わたなべ', 渡部:'わたなべ',
+  山本:'やまもと', 中村:'なかむら', 小林:'こばやし', 加藤:'かとう', 吉田:'よしだ',
+  山田:'やまだ', 佐々木:'ささき', 山口:'やまぐち', 松本:'まつもと', 井上:'いのうえ',
+  木村:'きむら', 林:'はやし', 斎藤:'さいとう', 斉藤:'さいとう', 齋藤:'さいとう',
+  齊藤:'さいとう', 清水:'しみず', 山崎:'やまざき', 阿部:'あべ', 森:'もり',
+  池田:'いけだ', 橋本:'はしもと', 山下:'やました', 石川:'いしかわ', 中島:'なかじま',
+  前田:'まえだ', 藤田:'ふじた', 後藤:'ごとう', 小川:'おがわ', 岡田:'おかだ',
+  村上:'むらかみ', 長谷川:'はせがわ', 近藤:'こんどう', 石井:'いしい', 坂本:'さかもと',
+  遠藤:'えんどう', 藤井:'ふじい', 青木:'あおき', 福田:'ふくだ', 三浦:'みうら',
+  西村:'にしむら', 藤原:'ふじわら', 太田:'おおた', 松田:'まつだ', 原田:'はらだ',
+  岡本:'おかもと', 中野:'なかの', 中川:'なかがわ', 小野:'おの', 田村:'たむら',
+  竹内:'たけうち', 金子:'かねこ', 和田:'わだ', 中山:'なかやま', 石田:'いしだ',
+  上田:'うえだ', 森田:'もりた', 原:'はら', 柴田:'しばた', 酒井:'さかい',
+  工藤:'くどう', 横山:'よこやま', 宮崎:'みやざき', 宮本:'みやもと', 内田:'うちだ',
+  高木:'たかぎ', 谷口:'たにぐち', 安藤:'あんどう', 丸山:'まるやま', 今井:'いまい',
+  大野:'おおの', 高田:'たかだ', 菅原:'すがわら', 河野:'こうの', 武田:'たけだ',
+  上野:'うえの', 杉山:'すぎやま', 増田:'ますだ', 小島:'こじま', 平野:'ひらの',
+  大塚:'おおつか', 千葉:'ちば', 久保:'くぼ', 松井:'まつい', 岩崎:'いわさき',
+  桜井:'さくらい', 木下:'きのした', 野口:'のぐち', 松尾:'まつお', 野村:'のむら',
+  新井:'あらい', 菊地:'きくち', 菊池:'きくち', 佐野:'さの', 市川:'いちかわ',
+  水野:'みずの', 矢野:'やの', 松岡:'まつおか', 大西:'おおにし', 吉川:'よしかわ',
+  五十嵐:'いがらし', 川口:'かわぐち', 平田:'ひらた', 関:'せき', 吉村:'よしむら',
+  石原:'いしはら', 飯田:'いいだ', 杉本:'すぎもと', 中田:'なかた', 川崎:'かわさき',
+  飯塚:'いいづか', 小山:'おやま', 本田:'ほんだ', 久保田:'くぼた', 荒井:'あらい',
+  大久保:'おおくぼ', 松下:'まつした', 星:'ほし', 栗原:'くりはら', 内藤:'ないとう',
+  松浦:'まつうら', 川村:'かわむら', 坂口:'さかぐち', 宮田:'みやた', 江口:'えぐち',
+  荒木:'あらき', 大島:'おおしま', 浜田:'はまだ', 濱田:'はまだ', 森本:'もりもと',
+  須藤:'すどう', 高野:'たかの', 望月:'もちづき', 古川:'ふるかわ', 小池:'こいけ',
+  白石:'しらいし', 森山:'もりやま', 村田:'むらた', 田口:'たぐち', 高山:'たかやま',
+  岡崎:'おかざき', 大川:'おおかわ', 山内:'やまうち', 安田:'やすだ', 片山:'かたやま',
+  吉岡:'よしおか', 永井:'ながい', 西山:'にしやま', 西田:'にしだ', 福島:'ふくしま',
+  福岡:'ふくおか', 佐竹:'さたけ', 川上:'かわかみ', 沢田:'さわだ', 澤田:'さわだ',
+  浅野:'あさの', 平井:'ひらい', 松村:'まつむら', 小泉:'こいずみ', 服部:'はっとり',
+  本間:'ほんま', 稲葉:'いなば', 岩田:'いわた', 東:'ひがし', 大谷:'おおたに',
+  熊谷:'くまがい', 中西:'なかにし', 中尾:'なかお', 永田:'ながた', 黒田:'くろだ',
+  大森:'おおもり', 秋山:'あきやま', 岩本:'いわもと', 落合:'おちあい', 堀:'ほり',
+  土屋:'つちや', 平山:'ひらやま', 広瀬:'ひろせ', 三好:'みよし', 村山:'むらやま',
+  山根:'やまね', 吉本:'よしもと', 徳永:'とくなが', 德永:'とくなが', 江藤:'えとう',
+  緒方:'おがた', 中原:'なかはら', 田代:'たしろ', 樋口:'ひぐち', 日高:'ひだか',
+  甲斐:'かい', 井手:'いで', 原口:'はらぐち', 古賀:'こが', 大石:'おおいし',
+  今村:'いまむら', 北村:'きたむら', 小松:'こまつ', 新田:'にった', 高島:'たかしま',
+  田辺:'たなべ', 田邊:'たなべ', 塚本:'つかもと', 寺田:'てらだ', 富田:'とみた',
+  長田:'ながた', 西川:'にしかわ', 野田:'のだ', 萩原:'はぎわら', 畠山:'はたけやま',
+  馬場:'ばば', 藤本:'ふじもと', 細川:'ほそかわ', 前川:'まえかわ', 牧野:'まきの',
+  三宅:'みやけ', 武藤:'むとう', 森川:'もりかわ', 柳沢:'やなぎさわ', 山川:'やまかわ',
+  横田:'よこた', 若林:'わかばやし', 大山:'おおやま', 奥田:'おくだ',
+  尾崎:'おざき', 笠原:'かさはら', 金井:'かない', 川島:'かわしま', 木山:'きやま',
+  倉田:'くらた', 黒木:'くろき', 河田:'かわた', 小森:'こもり', 坂田:'さかた',
+  島田:'しまだ', 下田:'しもだ', 園田:'そのだ', 滝沢:'たきざわ', 立石:'たていし',
+  津田:'つだ', 寺本:'てらもと', 土井:'どい', 永野:'ながの', 成田:'なりた',
+  西岡:'にしおか', 野上:'のがみ', 橋口:'はしぐち', 浜崎:'はまさき', 東田:'ひがしだ',
+  福永:'ふくなが', 藤崎:'ふじさき', 堀田:'ほった', 松崎:'まつざき', 真鍋:'まなべ',
+  宮下:'みやした', 森下:'もりした', 矢島:'やじま', 山添:'やまぞえ', 吉原:'よしはら'
+};
+let customerYomi = lsGet('nae-customer-yomi', {});   // { 名前: 'よみ' }（手直し分だけ保存）
+
+const KANA_SMALL = { 'ぁ':'あ','ぃ':'い','ぅ':'う','ぇ':'え','ぉ':'お','っ':'つ',
+                     'ゃ':'や','ゅ':'ゆ','ょ':'よ','ゎ':'わ','ゕ':'か','ゖ':'け' };
+const KANA_SEION = { 'が':'か','ぎ':'き','ぐ':'く','げ':'け','ご':'こ',
+                     'ざ':'さ','じ':'し','ず':'す','ぜ':'せ','ぞ':'そ',
+                     'だ':'た','ぢ':'ち','づ':'つ','で':'て','ど':'と',
+                     'ば':'は','び':'ひ','ぶ':'ふ','べ':'へ','ぼ':'ほ',
+                     'ぱ':'は','ぴ':'ひ','ぷ':'ふ','ぺ':'へ','ぽ':'ほ','ゔ':'う' };
+
+// カタカナ・全角英数をひらがな／半角に寄せる
+function toHiragana(s) {
+  return String(s ?? '')
+    .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    .replace(/[\s　]/g, '')
+    .toLowerCase();
+}
+function hasKanji(s) { return /[々㐀-鿿豈-﫿]/.test(String(s ?? '')); }
+
+// 読みの推定
+// ①「有限会社」などの肩書きは読み飛ばす ②よくある姓の表から探す
+// ③漢字が無ければ名前そのまま ④先頭がかな・英字の屋号はその部分を読みにする
+function estimateYomi(name) {
+  let n = String(name ?? '').replace(/[\s　]/g, '');
+  if (!n) return '';
+  n = n.replace(/^(?:一般社団法人|一般財団法人|農事組合法人|農業組合法人|有限会社|株式会社|合同会社|合資会社|医療法人|[（(](?:有|株|合|同|農)[)）])/, '');
+  if (!n) return '';
+  for (let len = Math.min(4, n.length); len >= 1; len--) {
+    const y = SURNAME_YOMI[n.slice(0, len)];
+    if (y) return y;
+  }
+  if (!hasKanji(n)) return toHiragana(n);
+  // 「ばば商店」「パプリカ工房」のように頭がかな／英字なら、その部分で並べる
+  const m = toHiragana(n).match(/^[^々㐀-鿿豈-﫿]+/);
+  return m ? m[0] : '';
+}
+function customerYomiOf(name) {
+  const fixed = (customerYomi[name] || '').trim();
+  return fixed ? toHiragana(fixed) : estimateYomi(name);
+}
+// 50音の並べ替えキー：清音・大文字に寄せたものを第1キー、元の読みを第2キーにする
+// （濁音は清音の後、小書きは大文字の後になる）
+function kanaSortKeys(yomi) {
+  const h = toHiragana(yomi).replace(/[ーー\-‐-―]/g, '');
+  const base = h.replace(/[ぁぃぅぇぉっゃゅょゎゕゖ]/g, c => KANA_SMALL[c])
+                .replace(/[がぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽゔ]/g, c => KANA_SEION[c]);
+  return [base, h];
+}
+// 注文主名を50音順に並べる（読みが分からないものは最後にまとめる）
+function sortCustomersByYomi(names) {
+  const known = [], unknown = [];
+  names.forEach(n => (customerYomiOf(n) ? known : unknown).push(n));
+  known.sort((a, b) => {
+    const [ka, ha] = kanaSortKeys(customerYomiOf(a));
+    const [kb, hb] = kanaSortKeys(customerYomiOf(b));
+    return ka.localeCompare(kb, 'ja') || ha.localeCompare(hb, 'ja') || a.localeCompare(b, 'ja');
+  });
+  unknown.sort((a, b) => a.localeCompare(b, 'ja'));
+  return { ordered: known.concat(unknown), unknown };
+}
+function allCustomerNames() {
+  return [...new Set(orders.map(o => (o.customer || '').trim()).filter(Boolean))];
+}
+
 function renderCustomerChips() {
   const box = document.getElementById('customer-chips');
-  const names = [...new Set(orders.map(o => (o.customer || '').trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'ja'));
-  if (!names.length) { box.style.display = 'none'; return; }
+  const { ordered, unknown } = sortCustomersByYomi(allCustomerNames());
+  if (!ordered.length) { box.style.display = 'none'; return; }
   box.style.display = 'flex';
   box.innerHTML = '';
   const all = document.createElement('button');
@@ -3901,15 +4038,78 @@ function renderCustomerChips() {
   all.textContent = '全て';
   all.onclick = () => { customerFilter = null; renderOrderList(); };
   box.appendChild(all);
-  names.forEach(n => {
+  ordered.forEach(n => {
     const chip = document.createElement('button');
     chip.className = 'cust-chip' + (customerFilter === n ? ' active' : '');
     chip.textContent = n;
+    chip.title = customerYomiOf(n) || '読み未設定';
     chip.onclick = () => {
       customerFilter = (customerFilter === n) ? null : n;   // 再タップで解除
       renderOrderList();
     };
     box.appendChild(chip);
+  });
+  // 読みが分からない注文主があれば、設定で直せることを知らせる
+  if (unknown.length) {
+    const fix = document.createElement('button');
+    fix.className = 'cust-chip';
+    fix.style.cssText = 'border-style:dashed;color:var(--text2)';
+    fix.textContent = '読み未設定 ' + unknown.length + '件 ›';
+    fix.onclick = () => {
+      showTab('settings');
+      setTimeout(() => {
+        const ed = document.getElementById('yomi-editor');
+        if (ed) ed.scrollIntoView({ block: 'start' });
+      }, 100);
+    };
+    box.appendChild(fix);
+  }
+}
+
+// 設定画面：読みの一覧と手直し
+function renderYomiEditor() {
+  const box = document.getElementById('yomi-editor');
+  if (!box) return;
+  const { ordered } = sortCustomersByYomi(allCustomerNames());
+  box.innerHTML = '';
+  if (!ordered.length) {
+    box.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--text2)">注文主がまだ登録されていません。</div>';
+    return;
+  }
+  ordered.forEach(n => {
+    const fixed = (customerYomi[n] || '').trim();
+    const est   = estimateYomi(n);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 16px;border-bottom:1px solid var(--border)';
+    const nm = document.createElement('div');
+    nm.style.cssText = 'flex:0 0 38%;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    nm.textContent = n;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'form-input';
+    inp.style.cssText = 'flex:1;font-size:13px;padding:6px 8px';
+    inp.value = fixed;
+    inp.placeholder = est ? est + '（推定）' : 'よみを入力（ひらがな）';
+    inp.inputMode = 'kana';
+    const badge = document.createElement('span');
+    badge.style.cssText = 'font-size:10px;flex-shrink:0;width:34px;text-align:right';
+    const paintBadge = () => {
+      const has = !!(customerYomi[n] || '').trim();
+      badge.textContent = has ? '確定' : (est ? '推定' : '未設定');
+      badge.style.color = has ? 'var(--green)' : (est ? 'var(--text2)' : '#E65100');
+    };
+    paintBadge();
+    const save = () => {
+      const v = inp.value.trim();
+      if (v) customerYomi[n] = v; else delete customerYomi[n];
+      lsSet('nae-customer-yomi', customerYomi);
+      paintBadge();
+      renderCustomerChips();
+    };
+    inp.onchange = save;
+    inp.onblur   = save;
+    row.appendChild(nm); row.appendChild(inp); row.appendChild(badge);
+    box.appendChild(row);
   });
 }
 

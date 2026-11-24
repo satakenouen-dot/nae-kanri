@@ -708,7 +708,7 @@ input[type=number]{-moz-appearance:textfield}
     </button>
     <button class="settings-item" id="btn-export-excel">
       <span class="settings-icon">📊</span>
-      <span>Excel/OpenOffice形式で書き出し</span>
+      <span>Excel/LibreOffice形式で書き出し</span>
       <span style="margin-left:auto;color:var(--text2)">›</span>
     </button>
     <div class="settings-section-title">Googleドライブ バックアップ</div>
@@ -1299,6 +1299,26 @@ document.getElementById('btn-export-data').onclick = () => {
 
 // ── Excel/OpenOffice形式エクスポート ────────────────
 // 列幅を内容に合わせて自動調整（全角文字は2文字分としてカウント）
+function autoFitColsAoa(aoa) {
+  const n = aoa.reduce((m, r) => Math.max(m, (r || []).length), 0);
+  const cols = [];
+  for (let c = 0; c < n; c++) {
+    let max = 0;
+    for (const r of aoa) {
+      const w = dispWidthEx((r || [])[c]);
+      if (w > max) max = w;
+    }
+    cols.push({ wch: Math.min(Math.max(max + 2, 8), 45) });
+  }
+  return cols;
+}
+function dispWidthEx(v) {
+  let w = 0;
+  for (const ch of String(v ?? '')) {
+    w += /[\u0000-ÿ｡-ￜ￨-￮]/.test(ch) ? 1 : 2;
+  }
+  return w;
+}
 function autoFitCols(rows) {
   if (!rows || !rows.length) return [];
   const dispWidth = (v) => {
@@ -1328,35 +1348,43 @@ document.getElementById('btn-export-excel').onclick = () => {
   try {
     const wb = XLSX.utils.book_new();
 
-    // ── 注文シート ──
-    // 播種が済んでいない注文を先頭に（播種日の早い順）、播種済みは後ろへ
+    // ── 注文シート（全生産分）──
+    // 並び順：①在圃中（納期の近い順）②播種前（播種予定日の近い順）③外注
+    //         → 1行空ける → ④出荷済み（出荷日が新しい＝今日に近い順）
     const _today = today();
-    const sortedOrders = [...orders].sort((a, b) => {
-      const aDone = (a.sowDate && a.sowDate <= _today) ? 1 : 0;
-      const bDone = (b.sowDate && b.sowDate <= _today) ? 1 : 0;
-      if (aDone !== bDone) return aDone - bDone;
-      return (a.sowDate || a.delivery || '9999').localeCompare(b.sowDate || b.delivery || '9999');
-    });
-    const orderRows = sortedOrders.map(o => ({
-      '注文入力日': o.orderDate || '',
-      '注文主': o.customer || '',
-      '品目': o.crop || '',
-      '品種': o.variety || '',
-      '苗規格': o.type || '',
-      '数量': o.qty || '',
-      '播種日': o.sowDate || '',
-      '接ぎ木日': o.graftDate || '',
-      '鉢上げ日': o.potDate || '',
-      '出荷日': o.shipDate || '',
-      '納期': o.delivery || '',
-      'メモ': o.memo || ''
-    }));
-    const orderData = orderRows.length ? orderRows : [{
-      '注文入力日':'','注文主':'','品目':'','品種':'','苗規格':'','数量':'',
-      '播種日':'','接ぎ木日':'','鉢上げ日':'','出荷日':'','納期':'','メモ':''
-    }];
-    const wsOrders = XLSX.utils.json_to_sheet(orderData);
-    wsOrders['!cols'] = autoFitCols(orderData);
+    const exStatus = (o) => {
+      if (o.shipDate && o.shipDate <= _today) return 'shipped';
+      if (isOutsourced(o)) return 'outsourced';   // 外注は自社の播種前／在圃中に混ぜない
+      if (isSown(o))       return 'growing';      // 実際に播種した注文だけ在圃中
+      return 'pending';
+    };
+    const g = { growing: [], pending: [], outsourced: [], shipped: [] };
+    orders.forEach(o => g[exStatus(o)].push(o));
+    const byAsc  = k => (a, b) => (a[k] || '9999-99-99').localeCompare(b[k] || '9999-99-99');
+    g.growing.sort(byAsc('delivery'));
+    g.pending.sort(byAsc('sowDate'));
+    // 外注：未発注を先に、納期の近い順（アプリの一覧と同じ並び）
+    g.outsourced.sort((a, b) => ((a.outsourceOrdered ? 1 : 0) - (b.outsourceOrdered ? 1 : 0)) ||
+                                (a.delivery || '9999-99-99').localeCompare(b.delivery || '9999-99-99'));
+    g.shipped.sort((a, b) => (b.shipDate || '').localeCompare(a.shipDate || ''));
+
+    const ORDER_HEADER = ['状態','注文入力日','注文主','品目','品種','苗規格','数量',
+      '播種予定日','播種日(実績)','播種枚数','接ぎ木日','鉢上げ日','出荷日','納期','メモ'];
+    const orderRow = (o, status) => [
+      status, o.orderDate || '', o.customer || '', o.crop || '', o.variety || '',
+      o.type || '', o.qty || '', o.sowDate || '', o.sowDateActual || '', o.sowTrays || '',
+      o.graftDate || '', o.potDate || '', o.shipDate || '', o.delivery || '', o.memo || ''
+    ];
+    const aoa = [ORDER_HEADER];
+    g.growing.forEach(o    => aoa.push(orderRow(o, '在圃中')));
+    g.pending.forEach(o    => aoa.push(orderRow(o, '播種前')));
+    g.outsourced.forEach(o => aoa.push(orderRow(o, '外注')));
+    // 未出荷分と出荷済み分の間を1行空ける
+    if (aoa.length > 1 && g.shipped.length) aoa.push([]);
+    g.shipped.forEach(o    => aoa.push(orderRow(o, '出荷済み')));
+
+    const wsOrders = XLSX.utils.aoa_to_sheet(aoa);
+    wsOrders['!cols'] = autoFitColsAoa(aoa);
     XLSX.utils.book_append_sheet(wb, wsOrders, '注文');
 
     // ── 農薬散布シート ──
